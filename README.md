@@ -1,4 +1,4 @@
-# FocusLens - ADHD Study Assistant 👁️✨ / 专注伴读仪
+# FocusLens -Study Assistant 👁️✨ / 专注伴读仪
 
 *[Skip to Chinese Version / 跳转至中文版](#中文版-chinese-version)*
 
