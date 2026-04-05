@@ -1,5 +1,7 @@
 # FocusLens - 专注伴读仪 👁️✨
 
+[English Version](./README_EN.md)
+
 ![纯本地浏览器环境](https://img.shields.io/badge/Environment-Pure%20Browser-success)
 ![Data Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-blue)
 ![Architecture](https://img.shields.io/badge/Tech-HTML5_|_MediaPipe-orange)
