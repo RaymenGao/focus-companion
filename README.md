@@ -53,7 +53,7 @@ Looking to modify the foundational thresholds, add granular logic, or understand
 ![Data Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-blue)
 ![Architecture](https://img.shields.io/badge/Tech-HTML5_|_MediaPipe-orange)
 
-这是一个为 ADHD（注意力缺陷与多动障碍）儿童及需要高度专注氛围的学习者而设计的——**充满人性和关怀温度的纯本地视觉护航系统**。它直接跑在任何一台带有现代浏览器的电脑上，不需要安装任何后台程序，绝对保护面部隐私。
+这是一个为注意力缺陷儿童及需要高度专注氛围的学习者而设计的——**充满人性和关怀温度的纯本地视觉护航系统**。它直接跑在任何一台带有现代浏览器的电脑上，不需要安装任何后台程序，绝对保护面部隐私。
 
 ## 🌟 核心理念与特色
 
