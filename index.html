@@ -60,33 +60,44 @@
     }
     
     #historyTable th, #historyTable td { border: 1px solid #ddd; text-align: center; }
-      #langBtn {
-      position: absolute;
-      top: 15px; right: 15px; 
-      background: #0f3460; border: 1px solid #4cd137; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 14px; z-index: 100;
+
+    #langBtn {
+      position: fixed;
+      top: 10px; right: 10px;
+      background: rgba(15, 52, 96, 0.9); border: 1px solid #4cd137; color: white;
+      padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
+      z-index: 100000;
+      transition: 0.2s;
     }
-    #langBtn:hover { background: #16213e; }
-</style>
+    #langBtn:hover { background: #16213e; transform: scale(1.05); }
+  </style>
 </head>
 <body>
   <button id="langBtn" onclick="toggleLanguage()">🌐 EN</button>
   
   <div id="historyModal" class="modal-overlay">
-    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;" data-i18n="hHistory">📊 长期记录与评估档案</h1>
+    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;" id="hHistoryTitle">📊 长期记录与评估档案</h1>
     <div style="margin:20px 0;">
-      <button class="control-btn" style="background:#fbc531; color: #111;" onclick="exportCSV()" data-i18n="btnExport">⬇️ 导出为表格文件 (.csv)</button>
-      <button class="control-btn secondary" onclick="closeHistory()" data-i18n="btnReturn">返回监控大厅</button>
+      <button class="control-btn" style="background:#fbc531; color: #111;" onclick="exportCSV()" id="btnExport">⬇️ 导出为表格文件 (.csv)</button>
+      <button class="control-btn secondary" onclick="closeHistory()" id="btnReturn">返回监控大厅</button>
     </div>
     
     <div style="width: 90%; max-width: 900px; margin: 0 auto; background: #1a1a2e; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-       <h3 style="color:#fff; margin-top:0; border-bottom: 1px solid #444; padding-bottom:10px; text-align: left;" data-i18n="hTrend">📉 近期连续得分波动（动态趋势）</h3>
+       <h3 style="color:#fff; margin-top:0; border-bottom: 1px solid #444; padding-bottom:10px; text-align: left;" id="hTrendTitle">📉 近期连续得分波动（动态趋势）</h3>
        <div id="trendChart" style="height: 180px; display:flex; align-items:flex-end; gap: 4px; padding-top: 20px; overflow-x: auto; border-bottom: 1px solid #555;"></div>
     </div>
 
     <div style="width: 90%; max-width: 900px; margin: 20px auto;">
       <table id="historyTable" style="width:100%; border-collapse: collapse; background: #fff; color: #111; border-radius: 8px; overflow:hidden;">
          <thead>
-           <tr style="background:#ddd;"><th style="padding:15px;" data-i18n="thDate">打卡日期</th><th data-i18n="thTime">系统追踪时长</th><th data-i18n="thScore">专注得分评估</th><th data-i18n="thG">🟩 无瑕疵专注</th><th data-i18n="thY">🟨 缓冲包容期</th><th data-i18n="thR">🟥 严重分心报警</th></tr>
+           <tr style="background:#ddd;">
+             <th style="padding:15px;" id="thDate">打卡日期</th>
+             <th id="thDuration">系统追踪时长</th>
+             <th id="thScore">专注得分评估</th>
+             <th id="thGreen">🟩 无瑕疵专注</th>
+             <th id="thYellow">🟨 缓冲包容期</th>
+             <th id="thRed">🟥 严重分心报警</th>
+           </tr>
          </thead>
          <tbody style="font-size: 15px;"></tbody>
       </table>
@@ -94,44 +105,43 @@
   </div>
 
   <div id="reportModal" class="modal-overlay">
-    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;" data-i18n="hReport">🏆 专注力挑战成绩单 🏆</h1>
+    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;" id="hReportTitle">🏆 专注力挑战成绩单 🏆</h1>
     <h2 id="finalScore" style="color:#fbc531; font-size: 3em; margin: 10px 0;">专注得分: 100</h2>
     <p id="timeSummary" style="color: #ccc; font-size: 1.2em;">总计训练时长: 15分钟</p>
 
     <div style="width: 90%; max-width: 800px; margin: 20px 0; background: #1a1a2e; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-      <h3 style="color:#fff; margin-top:0; text-align:left;" data-i18n="hHeatmap">📈 宏观专注热点波状图</h3>
+      <h3 style="color:#fff; margin-top:0; text-align:left;" id="hHeatmapTitle">📈 宏观专注热点波状图</h3>
       <div id="timelineCanvas" style="display:flex; height: 40px; width: 100%; border-radius: 5px; overflow: hidden; background: #222;"></div>
       <div style="margin-top:15px; font-size: 14px; text-align: left; display:flex; justify-content:space-between; color:#aaa;">
-        <span data-i18n="legG">🟩 专注的时长</span>
-        <span data-i18n="legY">🟨 有效的停顿缓冲</span>
-        <span data-i18n="legR">🟥 思想开小差受罚</span>
-        <span data-i18n="legW">⬜ 合理喝水休息</span>
+        <span id="legGreen">🟩 专注的时长</span>
+        <span id="legYellow">🟨 有效的停顿缓冲</span>
+        <span id="legRed">🟥 思想开小差受罚</span>
+        <span id="legWhite">⬜ 合理喝水休息</span>
       </div>
     </div>
 
     <div id="highlightContainer" style="display:none; width: 90%; max-width: 500px; margin: 20px 0; background: #fff; padding: 15px 15px 40px 15px; border-radius: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: rotate(-2deg);">
       <img id="highlightImg" src="" style="width: 100%; border: 1px solid #ddd; object-fit: cover; max-height: 400px;"/>
-      <h3 style="color:#2d3436; margin: 20px 0 0 0; font-family: 'Kaiti', '楷体', serif; font-size: 22px;" data-i18n="hHighlight">✨ 看！你全神贯注思考的样子多棒！✨</h3>
+      <h3 style="color:#2d3436; margin: 20px 0 0 0; font-family: 'Kaiti', '楷体', serif; font-size: 22px;" id="hHighlightText">✨ 看！你全神贯注思考的样子多棒！✨</h3>
     </div>
 
-    <button class="control-btn" onclick="closeReport()" style="margin-top: 30px; font-size: 1.2em; padding: 15px 30px; border-radius: 30px;" data-i18n="btnRecord">记录并返回主界面</button>
+    <button class="control-btn" onclick="closeReport()" style="margin-top: 30px; font-size: 1.2em; padding: 15px 30px; border-radius: 30px;" id="btnCloseReport">记录并返回主界面</button>
   </div>
 
   <div id="blackoutScreen">
-      <h1 style="font-size: 2em; opacity: 0.15; color: #fff;" data-i18n="blackH1">沉浸护眼陪伴模式</h1>
-      <p style="opacity: 0.1; color: #fff;" data-i18n="blackP">（此时 AI 大脑正在后台完全静默守护，按键盘左上角 ESC 键可退出）</p>
+      <h1 style="font-size: 2em; opacity: 0.15; color: #fff;" id="blackoutTitle">沉浸护眼陪伴模式</h1>
+      <p style="opacity: 0.1; color: #fff;" id="blackoutDesc">（此时 AI 大脑正在后台完全静默守护，按键盘左上角 ESC 键可退出）</p>
   </div>
 
-  <h2 data-i18n="mainTitle">学习辅助系统 - 专注伴读仪</h2>
+  <h2 id="mainTitle">学习辅助系统 - 专注伴读仪</h2>
   
-  <!-- 控制台重塑：增加了暂停按钮 -->
   <div>
-      <button class="control-btn start" onclick="toggleSession()" id="sessionBtn" data-i18n="btnSessionStart">▶️ 开始专注打卡学习 (进入记录模式)</button>
-      <button class="control-btn" style="background:#555; display:none;" onclick="togglePause()" id="pauseBtn" data-i18n="btnPause">⏸️ 临时休息/离开座位</button>
+      <button class="control-btn start" onclick="toggleSession()" id="sessionBtn">▶️ 开始专注打卡学习 (进入记录模式)</button>
+      <button class="control-btn" style="background:#555; display:none;" onclick="togglePause()" id="pauseBtn">⏸️ 临时休息/离开座位</button>
       <br>
-      <button class="control-btn" onclick="toggleScreen()" id="screenBtn" data-i18n="btnScreen">👁️ 开启全电脑极致黑屏模式</button>
-      <button class="control-btn secondary" onclick="toggleSettings()" data-i18n="btnSettings">⚙️ 展开校准面板</button>
-      <button class="control-btn" style="background:#fbc531; color:#111;" onclick="showHistory()" data-i18n="btnGlobal">📊 全局历史评估档案</button>
+      <button class="control-btn" onclick="toggleScreen()" id="screenBtn">👁️ 开启全电脑极致黑屏模式</button>
+      <button class="control-btn secondary" onclick="toggleSettings()" id="btnToggleSettings">⚙️ 展开校准面板</button>
+      <button class="control-btn" style="background:#fbc531; color:#111;" onclick="showHistory()" id="btnShowHistory">📊 全局历史评估档案</button>
   </div>
   
   <div style="position: relative; display: inline-block; width: 100%;">
@@ -139,194 +149,193 @@
     <canvas id="canvasElement" width="640" height="480"></canvas>
     
     <div id="settingsPanel" style="display: none;">
-      <h4 style="margin-top:0; color: #fff; border-bottom: 1px solid #fff; padding-bottom: 5px;" data-i18n="sTitle">🎯 系统与灵敏度设定</h4>
+      <h4 style="margin-top:0; color: #fff; border-bottom: 1px solid #fff; padding-bottom: 5px;" id="settingsTitle">🎯 系统与灵敏度设定</h4>
       
-      <label data-i18n="sMile">🏅 高光抓拍奖励里程碑:</label>
+      <label id="lblMilestone">🏅 高光抓拍奖励里程碑:</label>
       <select id="sliderMilestone" onchange="updateThresh()" style="border-radius:4px;">
-        <option value="15" id="opt15">🧪 演示测试模式 (连续达标 15秒)</option>
-        <option value="300" id="opt300">🥉 进步青铜 (连续达标 5分钟)</option>
-        <option value="600" id="opt600">🥈 坚定白银 (连续达标 10分钟)</option>
-        <option value="900" id="opt900" selected>🥇 优秀黄金 (连续达标 15分钟)</option>
-        <option value="1800" id="opt1800">💎 王者钻石 (连续达标 30分钟)</option>
+        <option value="15" id="optDemo">🧪 演示测试模式 (连续达标 15秒)</option>
+        <option value="300" id="optBronze">🥉 进步青铜 (连续达标 5分钟)</option>
+        <option value="600" id="optSilver">🥈 坚定白银 (连续达标 10分钟)</option>
+        <option value="900" id="optGold" selected>🥇 优秀黄金 (连续达标 15分钟)</option>
+        <option value="1800" id="optDiamond">💎 王者钻石 (连续达标 30分钟)</option>
       </select>
 
-      <label><span id="txtGrace">容忍思考时间: </span> <span id="valGrace" style="color:#fbc531;">10</span> <span id="txtGraceUnit">秒</span></label><br>
+      <label><span id="lblGrace">容忍思考时间:</span> <span id="valGrace" style="color:#fbc531;">10</span> <span id="lblGraceUnit">秒</span></label><br>
       <input type="range" id="sliderGrace" min="3" max="30" step="1" value="10" oninput="updateThresh()">
       
-      <label><span id="txtUp">抬头判罚阈值</span> (<span id="valUp" style="color:#e94560;">0.25</span>): </label>
+      <label><span id="lblUp">抬头判罚阈值</span> (<span id="valUp" style="color:#e94560;">0.25</span>): </label>
       <input type="range" id="sliderUp" min="0.0" max="0.5" step="0.01" value="0.25" oninput="updateThresh()">
-      <label><span id="txtDown">低头阅读阈值</span> (<span id="valDown" style="color:#4cd137;">0.50</span>): </label>
+      <label><span id="lblDown">低头阅读阈值</span> (<span id="valDown" style="color:#4cd137;">0.50</span>): </label>
       <input type="range" id="sliderDown" min="0.2" max="0.8" step="0.01" value="0.50" oninput="updateThresh()">
-      <label><span id="txtYaw">偏头判罚阈值</span> (<span id="valYaw" style="color:#fbc531;">0.22</span>): </label>
+      <label><span id="lblYaw">偏头判罚阈值</span> (<span id="valYaw" style="color:#fbc531;">0.22</span>): </label>
       <input type="range" id="sliderYaw" min="0.1" max="0.5" step="0.01" value="0.22" oninput="updateThresh()">
-      <label><span id="txtGaze">斜视判定阈值 (偏差 > </span><span id="valGaze" style="color:#1e90ff;">0.18</span>): </label>
+      <label><span id="lblGaze">斜视判定阈值 (偏差 ></span> <span id="valGaze" style="color:#1e90ff;">0.18</span>): </label>
       <input type="range" id="sliderGaze" min="0.05" max="0.40" step="0.01" value="0.18" oninput="updateThresh()">
 
       <hr style="border-top:1px dashed #777; margin:15px 0;">
-      <label id="sVoiceTxt">🎙️ 录制专属家长语音助手:</label><br>
-      <button class="record-btn" id="recordBtn" onclick="toggleRecording()" id="recBtnTxt">🔴 开始录音 (5秒内)</button>
-      <button class="record-btn" id="playBtn" onclick="playCustomAudio()" disabled id="btnRecPlay">▶️ 试听刚录的语音</button>
+      <label id="lblVoice">🎙️ 录制专属家长语音助手:</label><br>
+      <button class="record-btn" id="recordBtn" onclick="toggleRecording()">🔴 开始录音 (5秒内)</button>
+      <button class="record-btn" id="playBtn" onclick="playCustomAudio()" disabled>▶️ 试听刚录的语音</button>
 
       <hr style="border-top:1px dashed #777; margin:15px 0;">
-      <label id="sBgmTxt">🎵 学习沉浸背景音 (白噪音/音乐):</label><br>
+      <label id="lblBgm">🎵 学习沉浸背景音 (白噪音/音乐):</label><br>
       <input type="file" id="bgmUpload" accept="audio/mpeg, audio/mp3, audio/wav, audio/ogg" style="width: 100%; color:#aaa; font-size:12px; margin-bottom:5px;" onchange="loadBGM(this)">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <label style="font-size:12px; color:#ccc;" id="sBgmVolTxt">BGM音量:</label>
+          <label style="font-size:12px; color:#ccc;" id="lblBgmVol">BGM音量:</label>
           <input type="range" id="bgmVolume" min="0.0" max="1.0" step="0.01" value="0.20" style="width:65%; margin:0;" oninput="updateBGMVolume()">
       </div>
     </div>
   </div>
 
   <br>
-  <!-- 在未点击开始前，UI提示处于待机/校准状态 -->
   <div id="status" style="border: 2px dashed #e94560; color: #aaa;">💡 请先调整摄像头角度进行校准（尚未开始打卡计分）</div>
   <div id="timerStatus"></div>
 
   <script>
-
+    /* ===== INTERNATIONALIZATION (i18n) ===== */
     const locales = {
       zh: {
         title: "学习辅助系统 (Web PoC)",
-        hHistory: "📊 长期记录与评估档案",
+        mainTitle: "学习辅助系统 - 专注伴读仪",
+        hHistoryTitle: "📊 长期记录与评估档案",
         btnExport: "⬇️ 导出为表格文件 (.csv)",
         btnReturn: "返回监控大厅",
-        hTrend: "📉 近期连续得分波动（动态趋势）",
-        thDate: "打卡日期", thTime: "系统追踪时长", thScore: "专注得分评估", 
-        thG: "🟩 无瑕疵专注", thY: "🟨 缓冲包容期", thR: "🟥 严重分心报警",
+        hTrendTitle: "📉 近期连续得分波动（动态趋势）",
+        thDate: "打卡日期", thDuration: "系统追踪时长", thScore: "专注得分评估",
+        thGreen: "🟩 无瑕疵专注", thYellow: "🟨 缓冲包容期", thRed: "🟥 严重分心报警",
         noHistory: "暂无历史打卡记录",
-        hReport: "🏆 专注力挑战成绩单 🏆",
+        hReportTitle: "🏆 专注力挑战成绩单 🏆",
         scoreLabel: "专注得分: ",
-        timeLabel: "总计训练时长: ",
-        minLabel: "分", secLabel: "秒",
-        hHeatmap: "📈 宏观专注热点波状图",
-        legG: "🟩 专注的时长", legY: "🟨 有效的停顿缓冲", legR: "🟥 思想开小差受罚", legW: "⬜ 合理喝水休息",
-        hHighlight: "✨ 看！你全神贯注思考的样子多棒！✨",
-        btnRecord: "记录并返回主界面",
-        blackH1: "沉浸护眼陪伴模式",
-        blackP: "（此时 AI 大脑正在后台完全静默守护，按键盘左上角 ESC 键可退出）",
-        mainTitle: "学习辅助系统 - 专注伴读仪",
+        timeLabel: "本次累计时间: ",
+        minUnit: "分", secUnit: "秒",
+        hHeatmapTitle: "📈 宏观专注热点波状图",
+        legGreen: "🟩 专注的时长", legYellow: "🟨 有效的停顿缓冲",
+        legRed: "🟥 思想开小差受罚", legWhite: "⬜ 合理喝水休息",
+        hHighlightText: "✨ 看！你全神贯注思考的样子多棒！✨",
+        btnCloseReport: "记录并返回主界面",
+        blackoutTitle: "沉浸护眼陪伴模式",
+        blackoutDesc: "（此时 AI 大脑正在后台完全静默守护，按键盘左上角 ESC 键可退出）",
         btnSessionStart: "▶️ 开始专注打卡学习 (进入记录模式)",
         btnSessionStop: "⏹️ 结束本次专注学习并生成复盘战报",
         btnPause: "⏸️ 临时休息/离开座位",
-        btnPauseEnd: "▶️ 休息结束，立刻恢复打卡监控",
+        btnPauseResume: "▶️ 休息结束，立刻恢复打卡监控",
         btnPauseKey: "⏸️ 临时休息 (可按空格键)",
         btnScreen: "👁️ 开启全电脑极致黑屏模式",
-        btnSettings: "⚙️ 展开校准面板",
-        btnGlobal: "📊 全局历史评估档案",
-        sTitle: "🎯 系统与灵敏度设定",
-        sMile: "🏅 高光抓拍奖励里程碑:",
-        opt15: "🧪 演示测试模式 (连续达标 15秒)",
-        opt300: "🥉 进步青铜 (连续达标 5分钟)",
-        opt600: "🥈 坚定白银 (连续达标 10分钟)",
-        opt900: "🥇 优秀黄金 (连续达标 15分钟)",
-        opt1800: "💎 王者钻石 (连续达标 30分钟)",
-        sGrace: "容忍思考时间: ", sGraceUnit: " " + t("secLabel"),
-        sUp: "抬头判罚阈值", sDown: "低头阅读阈值", sYaw: "偏头判罚阈值", sGaze: "斜视判定阈值 (偏差 > ",
-        sVoice: "🎙️ 录制专属家长语音助手:",
+        btnToggleSettings: "⚙️ 展开校准面板",
+        btnShowHistory: "📊 全局历史评估档案",
+        settingsTitle: "🎯 系统与灵敏度设定",
+        lblMilestone: "🏅 高光抓拍奖励里程碑:",
+        optDemo: "🧪 演示测试模式 (连续达标 15秒)",
+        optBronze: "🥉 进步青铜 (连续达标 5分钟)",
+        optSilver: "🥈 坚定白银 (连续达标 10分钟)",
+        optGold: "🥇 优秀黄金 (连续达标 15分钟)",
+        optDiamond: "💎 王者钻石 (连续达标 30分钟)",
+        lblGrace: "容忍思考时间:", lblGraceUnit: "秒",
+        lblUp: "抬头判罚阈值", lblDown: "低头阅读阈值",
+        lblYaw: "偏头判罚阈值", lblGaze: "斜视判定阈值 (偏差 >",
+        lblVoice: "🎙️ 录制专属家长语音助手:",
         btnRecStart: "🔴 开始录音 (5秒内)",
         btnRecStop: "⏹️ 停止录制 (正在录音...)",
-        btnRecRe: "🔴 重新录音",
-        btnRecPlay: "▶️ 试听刚录的语音",
-        sBgm: "🎵 学习沉浸背景音 (白噪音/音乐):",
-        sBgmVol: "BGM音量:",
+        btnRecRestart: "🔴 重新录音",
+        playBtn: "▶️ 试听刚录的语音",
+        lblBgm: "🎵 学习沉浸背景音 (白噪音/音乐):",
+        lblBgmVol: "BGM音量:",
         stInit: "💡 请先调整摄像头角度进行校准（尚未开始打卡计分）",
         stPaused: "⏸️ 系统已暂停监控数据，放心喝水去吧！",
-        stNormalRest: "⏸️ 正常休息/上厕所 (守护悬停中...)",
+        stPausedHover: "⏸️ 正常休息/上厕所 (守护悬停中...)",
         warnTrigger: "🚫 警报已经触发：请迅速恢复专注状态！",
-        warnCount: "⚠️ 注意力漂移监测中：倒计时 ",
-        warnCountSuffix: " 秒之后触发纠正指令",
-        warnCont: "🚫 警报持续触发：请迅速恢复您的专注状态！",
+        warnCountdown: "⚠️ 注意力漂移监测中：倒计时 ",
+        warnCountdownSuffix: " 秒之后触发纠正指令",
+        warnContinue: "🚫 警报持续触发：请迅速恢复您的专注状态！",
         errAbsent: "🪑 严重异常：没看镜头或离开座位！",
-        errDetect: "[待机] 离开主核心区域",
+        errStandby: "[待机] 离开主核心区域",
         errCamera: "无法获取权限！",
         errTooShort: "体验太短啦！没有足够的数据建模型。",
         exportFail: "暂无数据可供导出哦！",
-        exportName: "历史评估档案.csv",
-        
-        prefNormal: "",
-        prefTest: "[待机测试] ",
-        yawR: "👀 瞬间偏移：东张西望 (偏右)",
-        yawL: "👀 瞬间偏移：东张西望 (偏左)",
-        pitchU: "👀 瞬间偏移：抬头望天/后仰",
-        gazeW: "🙄 瞬间偏移：眼神飘忽跑神",
-        pitchD: "📖 保持专注：纸质桌前阅读时间",
-        focusS: "💻 保持专注：电子屏幕网课学习",
+        exportFilename: "历史评估档案.csv",
+        prefStandby: "[待机测试] ",
+        yawRight: "👀 瞬间偏移：东张西望 (偏右)",
+        yawLeft: "👀 瞬间偏移：东张西望 (偏左)",
+        pitchUp: "👀 瞬间偏移：抬头望天/后仰",
+        gazeWander: "🙄 瞬间偏移：眼神飘忽跑神",
+        focusPaper: "📖 保持专注：纸质桌前阅读时间",
+        focusScreen: "💻 保持专注：电子屏幕网课学习",
         highProg: "高光进度: ",
         highDone: "已完成盲拍！",
         langBtn: "🌐 EN"
       },
       en: {
         title: "FocusLens (Web PoC)",
-        hHistory: "📊 Long-Term Records & Assessment History",
+        mainTitle: "FocusLens - Study Assistant",
+        hHistoryTitle: "📊 Long-Term Records & Assessment",
         btnExport: "⬇️ Export Data (.csv)",
         btnReturn: "Return to Dashboard",
-        hTrend: "📉 Recent Score Volatility",
-        thDate: "Date", thTime: "Tracked Duration", thScore: "Focus Score", 
-        thG: "🟩 Flawless Focus", thY: "🟨 Grace Period", thR: "🟥 Alerted",
-        noHistory: "No history records available yet",
-        hReport: "🏆 Focus Challenge Report 🏆",
+        hTrendTitle: "📉 Recent Score Trend",
+        thDate: "Date", thDuration: "Duration", thScore: "Focus Score",
+        thGreen: "🟩 Flawless Focus", thYellow: "🟨 Grace Period", thRed: "🟥 Alerted",
+        noHistory: "No history records yet",
+        hReportTitle: "🏆 Focus Challenge Report 🏆",
         scoreLabel: "Focus Score: ",
-        timeLabel: "Total Training Time: ",
-        minLabel: "min", secLabel: "sec",
-        hHeatmap: "📈 Macroscopic Focus Heatmap",
-        legG: "🟩 Focused Time", legY: "🟨 Valid Pause/Buffer", legR: "🟥 Distracted Penalty", legW: "⬜ Water & Rest",
-        hHighlight: "✨ Look! You are doing amazing when fully focused! ✨",
-        btnRecord: "Save & Return to Main",
-        blackH1: "Immersive Eye-Care Mode",
-        blackP: "(The AI brain is silently guarding in the background. Press ESC to exit)",
-        mainTitle: "FocusLens - Study Assistant",
-        btnSessionStart: "▶️ Start Focus Session (Enter Record Mode)",
-        btnSessionStop: "⏹️ End Focus Session & Generate Report",
+        timeLabel: "Total Session Time: ",
+        minUnit: "min", secUnit: "sec",
+        hHeatmapTitle: "📈 Focus Heatmap",
+        legGreen: "🟩 Focused Time", legYellow: "🟨 Valid Pause/Buffer",
+        legRed: "🟥 Distracted Penalty", legWhite: "⬜ Water & Rest",
+        hHighlightText: "✨ Look! You're amazing when fully focused! ✨",
+        btnCloseReport: "Save & Return to Main",
+        blackoutTitle: "Immersive Eye-Care Mode",
+        blackoutDesc: "(AI guardian is silently watching in the background. Press ESC to exit)",
+        btnSessionStart: "▶️ Start Focus Session (Record Mode)",
+        btnSessionStop: "⏹️ End Session & Generate Report",
         btnPause: "⏸️ Pause / Step Away",
-        btnPauseEnd: "▶️ End Pause & Resume Monitoring",
+        btnPauseResume: "▶️ Resume Monitoring",
         btnPauseKey: "⏸️ Quick Pause (Spacebar)",
         btnScreen: "👁️ Toggle Full-Screen Blackout",
-        btnSettings: "⚙️ Toggle Settings",
-        btnGlobal: "📊 Global History Assessment",
-        sTitle: "🎯 System & Sensitivity Settings",
-        sMile: "🏅 Highlight Snapshot Milestone:",
-        opt15: "🧪 Demo Mode (15 sec focus)",
-        opt300: "🥉 Bronze (5 min focus)",
-        opt600: "🥈 Silver (10 min focus)",
-        opt900: "🥇 Gold (15 min focus)",
-        opt1800: "💎 Diamond (30 min focus)",
-        sGrace: "Grace Period: ", sGraceUnit: "sec",
-        sUp: "Look Up Penalty", sDown: "Look Down (Reading)", sYaw: "Turn Head Penalty", sGaze: "Gaze Deviation ( > ",
-        sVoice: "🎙️ Custom Voice Assistant:",
+        btnToggleSettings: "⚙️ Toggle Settings",
+        btnShowHistory: "📊 Global History",
+        settingsTitle: "🎯 System & Sensitivity Settings",
+        lblMilestone: "🏅 Highlight Snapshot Milestone:",
+        optDemo: "🧪 Demo Mode (15 sec focus)",
+        optBronze: "🥉 Bronze (5 min focus)",
+        optSilver: "🥈 Silver (10 min focus)",
+        optGold: "🥇 Gold (15 min focus)",
+        optDiamond: "💎 Diamond (30 min focus)",
+        lblGrace: "Grace Period:", lblGraceUnit: "sec",
+        lblUp: "Look-Up Penalty", lblDown: "Look-Down (Reading)",
+        lblYaw: "Turn-Head Penalty", lblGaze: "Gaze Deviation ( >",
+        lblVoice: "🎙️ Custom Parent Voice Alert:",
         btnRecStart: "🔴 Start Recording (5s)",
         btnRecStop: "⏹️ Stop Recording...",
-        btnRecRe: "🔴 Re-Record",
-        btnRecPlay: "▶️ Play Recording",
-        sBgm: "🎵 Immersion BGM (Music):",
-        sBgmVol: "BGM Vol:",
-        stInit: "💡 Callibrate your camera position first (Session has not started)",
+        btnRecRestart: "🔴 Re-Record",
+        playBtn: "▶️ Play Recording",
+        lblBgm: "🎵 Immersion BGM (White Noise / Music):",
+        lblBgmVol: "BGM Volume:",
+        stInit: "💡 Calibrate your camera first (Session not started)",
         stPaused: "⏸️ Monitoring paused. Feel free to step away!",
-        stNormalRest: "⏸️ Normal rest/bathroom (Guardian hovering...)",
-        warnTrigger: "🚫 ALARM TRIGGERED: Restore focus!",
-        warnCount: "⚠️ Attention drifting: Alarm in ",
-        warnCountSuffix: " seconds",
-        warnCont: "🚫 ALARM CONTINUES: Restore focus immediately!",
+        stPausedHover: "⏸️ Resting (Guardian hovering...)",
+        warnTrigger: "🚫 ALARM: Restore focus now!",
+        warnCountdown: "⚠️ Attention drifting: Alarm in ",
+        warnCountdownSuffix: " seconds",
+        warnContinue: "🚫 ALARM CONTINUES: Restore focus immediately!",
         errAbsent: "🪑 Out of frame or away from seat!",
-        errDetect: "[Standby] Off-center or away",
+        errStandby: "[Standby] Off-center or away",
         errCamera: "Cannot access camera/mic!",
-        errTooShort: "Session too short to generate a model!",
-        exportFail: "No data available to export!",
-        exportName: "FocusHistory.csv",
-
-        prefNormal: "",
-        prefTest: "[STANDBY] ",
-        yawR: "👀 Instant Drift: Looking Right",
-        yawL: "👀 Instant Drift: Looking Left",
-        pitchU: "👀 Instant Drift: Looking Up/Back",
-        gazeW: "🙄 Instant Drift: Gaze Wandering",
-        pitchD: "📖 Focused: Reading on Desk",
-        focusS: "💻 Focused: Looking at Screen",
+        errTooShort: "Session too short to generate a report!",
+        exportFail: "No data to export!",
+        exportFilename: "FocusHistory.csv",
+        prefStandby: "[STANDBY] ",
+        yawRight: "👀 Drift: Looking Right",
+        yawLeft: "👀 Drift: Looking Left",
+        pitchUp: "👀 Drift: Looking Up/Back",
+        gazeWander: "🙄 Drift: Gaze Wandering",
+        focusPaper: "📖 Focused: Reading on Desk",
+        focusScreen: "💻 Focused: Looking at Screen",
         highProg: "Highlight: ",
         highDone: "Snapshot Taken!",
         langBtn: "🌐 中文"
       }
     };
-    
+
     let currentLang = localStorage.getItem('focus_lang') || 'zh';
     function t(key) { return locales[currentLang][key] || key; }
 
@@ -336,50 +345,79 @@
         applyTranslations();
     }
 
+    /* Map of element IDs to locale keys for simple innerText replacement */
+    const staticI18nMap = {
+        'mainTitle': 'mainTitle',
+        'hHistoryTitle': 'hHistoryTitle',
+        'btnExport': 'btnExport',
+        'btnReturn': 'btnReturn',
+        'hTrendTitle': 'hTrendTitle',
+        'thDate': 'thDate', 'thDuration': 'thDuration', 'thScore': 'thScore',
+        'thGreen': 'thGreen', 'thYellow': 'thYellow', 'thRed': 'thRed',
+        'hReportTitle': 'hReportTitle',
+        'hHeatmapTitle': 'hHeatmapTitle',
+        'legGreen': 'legGreen', 'legYellow': 'legYellow',
+        'legRed': 'legRed', 'legWhite': 'legWhite',
+        'hHighlightText': 'hHighlightText',
+        'btnCloseReport': 'btnCloseReport',
+        'blackoutTitle': 'blackoutTitle',
+        'blackoutDesc': 'blackoutDesc',
+        'btnToggleSettings': 'btnToggleSettings',
+        'btnShowHistory': 'btnShowHistory',
+        'settingsTitle': 'settingsTitle',
+        'lblMilestone': 'lblMilestone',
+        'optDemo': 'optDemo', 'optBronze': 'optBronze', 'optSilver': 'optSilver',
+        'optGold': 'optGold', 'optDiamond': 'optDiamond',
+        'lblGrace': 'lblGrace', 'lblGraceUnit': 'lblGraceUnit',
+        'lblUp': 'lblUp', 'lblDown': 'lblDown',
+        'lblYaw': 'lblYaw', 'lblGaze': 'lblGaze',
+        'lblVoice': 'lblVoice',
+        'lblBgm': 'lblBgm',
+        'lblBgmVol': 'lblBgmVol',
+        'langBtn': 'langBtn'
+    };
+
     function applyTranslations() {
-        document.querySelectorAll('[data-i18n]').forEach(el => { el.innerText = t(el.getAttribute('data-i18n')); });
-        document.getElementById('opt15').innerText = t('opt15');
-        document.getElementById('opt300').innerText = t('opt300');
-        document.getElementById('opt600').innerText = t('opt600');
-        document.getElementById('opt900').innerText = t('opt900');
-        document.getElementById('opt1800').innerText = t('opt1800');
-        document.getElementById('txtGrace').innerText = t('sGrace');
-        document.getElementById('txtGraceUnit').innerText = t('sGraceUnit');
-        document.getElementById('txtUp').innerText = t('sUp');
-        document.getElementById('txtDown').innerText = t('sDown');
-        document.getElementById('txtYaw').innerText = t('sYaw');
-        document.getElementById('txtGaze').innerText = t('sGaze');
-        document.getElementById('sVoiceTxt').innerText = t('sVoice');
-        
-        let recBt = document.getElementById('recordBtn');
-        if (recBt) {
-            if (recBt.innerText.includes('🔴') && !recBt.innerText.includes('重新') && !recBt.innerText.includes('Re-')) recBt.innerText = t('btnRecStart');
-            else if (recBt.innerText.includes('重新') || recBt.innerText.includes('Re-')) recBt.innerText = t('btnRecRe');
-            else recBt.innerText = t('btnRecStop');
+        /* Static elements */
+        for (const [id, key] of Object.entries(staticI18nMap)) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = t(key);
         }
-        
-        document.getElementById('btnRecPlay').innerText = t('btnRecPlay');
-        document.getElementById('sBgmTxt').innerText = t('sBgm');
-        document.getElementById('sBgmVolTxt').innerText = t('sBgmVol');
-        
+
+        /* Dynamic session buttons */
         if (!isSessionActive) {
-            document.getElementById('status').innerText = t('stInit');
+            statusEl.innerText = t('stInit');
             document.getElementById('sessionBtn').innerText = t('btnSessionStart');
             document.getElementById('pauseBtn').innerText = t('btnPause');
+            document.getElementById('screenBtn').innerText = t('btnScreen');
         } else {
             document.getElementById('sessionBtn').innerText = t('btnSessionStop');
+            document.getElementById('screenBtn').innerText = t('btnScreen');
             if (isSessionPaused) {
-                document.getElementById('pauseBtn').innerText = t('btnPauseEnd');
-                document.getElementById('status').innerText = t('stPaused');
+                document.getElementById('pauseBtn').innerText = t('btnPauseResume');
+                statusEl.innerText = t('stPaused');
             } else {
                 document.getElementById('pauseBtn').innerText = t('btnPauseKey');
             }
         }
-        
+
+        /* Recording button - detect current state */
+        const recBtn = document.getElementById('recordBtn');
+        if (recBtn) {
+            if (recBtn.dataset.recState === 'recording') {
+                recBtn.innerText = t('btnRecStop');
+            } else if (recBtn.dataset.recState === 'done') {
+                recBtn.innerText = t('btnRecRestart');
+            } else {
+                recBtn.innerText = t('btnRecStart');
+            }
+        }
+        document.getElementById('playBtn').innerText = t('playBtn');
+
         document.title = t('title');
-        document.getElementById('langBtn').innerText = t('langBtn');
     }
 
+    /* ===== CORE APPLICATION ===== */
     const videoElement = document.getElementById('videoElement');
     const canvasElement = document.getElementById('canvasElement');
     const canvasCtx = canvasElement.getContext('2d');
@@ -392,7 +430,7 @@
         let history = histStr ? JSON.parse(histStr) : [];
         let now = new Date();
         let dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + " " + String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
-        let dStr = Math.floor(durationSecs / 60) + t("minLabel") + " " + (durationSecs % 60) + " " + t("secLabel");
+        let dStr = Math.floor(durationSecs / 60) + t("minUnit") + " " + (durationSecs % 60) + t("secUnit");
 
         history.push({
             date: dateStr, duration: durationSecs, durationFmt: dStr, score: score,
@@ -403,6 +441,7 @@
 
     function showHistory() {
         document.getElementById('historyModal').style.display = 'flex';
+        applyTranslations(); /* Refresh table headers */
         let histStr = localStorage.getItem('adhd_study_history');
         let history = histStr ? JSON.parse(histStr) : [];
         let tbody = document.querySelector('#historyTable tbody');
@@ -419,7 +458,7 @@
         reversedHistory.forEach(h => {
             let tr = document.createElement('tr');
             tr.style.borderBottom = "1px solid #eee";
-            tr.innerHTML = `<td style="padding:15px;">${h.date}</td><td>${h.durationFmt}</td><td style="font-weight:bold; color:${h.score >= 80 ? '#20bf6b' : (h.score >= 50 ? '#fbc531' : '#eb3b5a')}; font-size:1.2em;">${h.score}分</td><td style="color:#20bf6b;">${h.green} 秒</td><td style="color:#d35400;">${h.yellow} 秒</td><td style="color:#eb3b5a; font-weight:bold;">${h.red} 秒</td>`;
+            tr.innerHTML = `<td style="padding:15px;">${h.date}</td><td>${h.durationFmt}</td><td style="font-weight:bold; color:${h.score >= 80 ? '#20bf6b' : (h.score >= 50 ? '#fbc531' : '#eb3b5a')}; font-size:1.2em;">${h.score}</td><td style="color:#20bf6b;">${h.green} ${t("secUnit")}</td><td style="color:#d35400;">${h.yellow} ${t("secUnit")}</td><td style="color:#eb3b5a; font-weight:bold;">${h.red} ${t("secUnit")}</td>`;
             tbody.appendChild(tr);
         });
 
@@ -448,26 +487,25 @@
         if(!histStr) { alert(t("exportFail")); return; }
         let history = JSON.parse(histStr);
         let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-        csvContent += "日期,坚持总时长(纯秒数),总体专注得分,完美专注积累(秒),容忍思考总时长(秒),走神被警告时长(秒)\r\n";
+        csvContent += "Date,Duration(sec),Score,Focused(sec),Grace(sec),Distracted(sec)\r\n";
         history.forEach(h => {
             csvContent += `${h.date},${h.duration},${h.score},${h.green},${h.yellow},${h.red}\r\n`;
         });
         let encodedUri = encodeURI(csvContent);
         let link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", ""+t("exportName")+"");
+        link.setAttribute("download", t("exportFilename"));
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
     /* ----- SESSION & ANALYTICS CONTROL ----- */
     let isSessionActive = false;
-    let isSessionPaused = false; // 新增：暂停能力
+    let isSessionPaused = false;
     let sessionLog = [];
     let sessionInterval = null;
     let continuousFocusSec = 0;
     let highlightImageBase64 = null;
 
-    // 状态机核心参数
     let globalState = "FOCUSED";
     let distractionStartTime = 0;
     let lastVoiceWarningTime = 0;
@@ -499,8 +537,8 @@
             
             sessionInterval = setInterval(() => {
                 if (isSessionPaused) {
-                    sessionLog.push("PAUSED"); // 在数组里记录下这段空白历史
-                    return; // 暂停时不计入得分和高光时间，不拉响警报
+                    sessionLog.push("PAUSED");
+                    return;
                 }
 
                 sessionLog.push(globalState);
@@ -541,18 +579,16 @@
         isSessionPaused = !isSessionPaused;
         const pBtn = document.getElementById('pauseBtn');
         if (isSessionPaused) {
-            // 切入休息状态
-            pBtn.innerText = t("btnPauseEnd");
+            pBtn.innerText = t("btnPauseResume");
             pBtn.style.background = "#20bf6b";
             statusEl.innerText = t("stPaused");
             statusEl.className = "";
             timerStatusEl.innerText = "";
             bgmAudio.pause();
         } else {
-            // 恢复
             pBtn.innerText = t("btnPauseKey");
             pBtn.style.background = "#555";
-            globalState = "FOCUSED"; // reset缓冲一下免得刚回来就报警
+            globalState = "FOCUSED";
             if (bgmAudio.src) bgmAudio.play().catch(e=>console.log(e));
         }
     }
@@ -567,7 +603,7 @@
         let totalSecs = sessionLog.length;
         let timeMins = Math.floor(totalSecs / 60);
         let remainSecs = totalSecs % 60;
-        document.getElementById('timeSummary').innerText = `${t("timeLabel")} ${timeMins}${t("minLabel")} ${remainSecs}${t("secLabel")}`;
+        document.getElementById('timeSummary').innerText = `${t("timeLabel")}${timeMins}${t("minUnit")} ${remainSecs}${t("secUnit")}`;
 
         let greenCount = 0;
         let yellowCount = 0;
@@ -587,7 +623,6 @@
             timeline.appendChild(block);
         });
 
-        // 计分只针对那些“没有暂停真实在学”的时间基数，如果都在暂停那没意义
         let activeTime = totalSecs - pauseCount;
         if(activeTime <= 0) activeTime = 1;
         let redRatio = redCount / activeTime; 
@@ -605,6 +640,7 @@
             document.getElementById('highlightContainer').style.display = 'none';
         }
 
+        applyTranslations(); /* Refresh report labels */
         saveSessionToHistory(totalSecs, score, greenCount, yellowCount, redCount);
     }
 
@@ -618,18 +654,16 @@
         if (!document.fullscreenElement) {
             isScreenHidden = false;
             document.getElementById('blackoutScreen').style.display = 'none';
-            document.getElementById('screenBtn').innerText = "👁️ 开启全电脑极致黑屏模式";
+            document.getElementById('screenBtn').innerText = t("btnScreen");
             statusEl.style.visibility = "visible";
             timerStatusEl.style.visibility = "visible";
         }
     });
 
-    // 全局快捷键监听：空格键一键暂停
     document.addEventListener("keydown", (e) => {
         if (e.code === "Space" && isSessionActive) {
-            // 防止在调节数值或者输入框时误触
             if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT") return;
-            e.preventDefault(); // 防止网页往下滚
+            e.preventDefault();
             togglePause();
         }
     });
@@ -691,7 +725,9 @@
 
     async function toggleRecording() {
         const btn = document.getElementById('recordBtn');
-        if (btn.innerText.includes("开始") || btn.innerText.includes("重新")) {
+        const state = btn.dataset.recState || 'idle';
+
+        if (state === 'idle' || state === 'done') {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
@@ -702,22 +738,24 @@
                     customAudioUrl = URL.createObjectURL(audioBlob);
                     customAudio.src = customAudioUrl;
                     document.getElementById('playBtn').disabled = false;
-                    btn.innerText = "🔴 重新录音";
-                    stream.getTracks().forEach(t => t.stop()); 
+                    btn.dataset.recState = 'done';
+                    btn.innerText = t("btnRecRestart");
+                    stream.getTracks().forEach(tr => tr.stop()); 
                 };
                 mediaRecorder.start();
-                btn.innerText = "⏹️ 停止录制 (正在录音...)";
+                btn.dataset.recState = 'recording';
+                btn.innerText = t("btnRecStop");
                 btn.style.background = "#e84118";
                 
                 setTimeout(() => { if(mediaRecorder && mediaRecorder.state === 'recording') toggleRecording(); }, 5000);
             } catch (err) { alert(t("errCamera")); }
-        } else if (btn.innerText.includes("停止")) {
+        } else if (state === 'recording') {
             mediaRecorder.stop();
             btn.style.background = "#4cd137";
         }
     }
 
-    // 全局懒加载 AudioContext 防止在识别循环中创建导致 WebGL 崩溃
+    // Lazy-init AudioContext
     let sharedAudioCtx = null;
     document.body.addEventListener('click', () => {
         try {
@@ -735,7 +773,7 @@
         if (isSessionPaused) return; 
         
         try {
-            if (!sharedAudioCtx) return; // 若用户全程未产生任何点击，按浏览器规范注定无法发声
+            if (!sharedAudioCtx) return;
             if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(e => console.log(e));
             
             function beep(freq, delaySecs, durationSecs) {
@@ -781,7 +819,7 @@
     }
 
     function processStateMachine(instantIsDistracted, instantActionName) {
-        if (isSessionPaused) return; // 暂停不处理状态分发
+        if (isSessionPaused) return;
         
         let now = Date.now();
         if (!instantIsDistracted) {
@@ -797,11 +835,11 @@
                 timerStatusEl.innerHTML = `<b>${t("warnTrigger")}</b>`;
             } else {
                 let secLeft = Math.ceil(timeDiffMs / 1000);
-                timerStatusEl.innerHTML = `${t("warnCount")}<b style="color:#e94560; font-size:1.5em;">${secLeft}</b>${t("warnCountSuffix")}`;
+                timerStatusEl.innerHTML = `${t("warnCountdown")}<b style="color:#e94560; font-size:1.5em;">${secLeft}</b>${t("warnCountdownSuffix")}`;
             }
         } else if (globalState === "ALARM") {
-            triggerVoiceWarning(); // 确保持续走神时能够反复触发警报
-            timerStatusEl.innerHTML = `<b>${t("warnCont")}</b>`;
+            triggerVoiceWarning();
+            timerStatusEl.innerHTML = `<b>${t("warnContinue")}</b>`;
         }
     }
 
@@ -851,30 +889,29 @@
         
         let instantIsDistracted = false;
 
-        // 【如果系统被暂停，直接强行阻断所有渲染反馈】
         if (isSessionPaused) {
-            statusEl.innerText = t("stNormalRest");
+            statusEl.innerText = t("stPausedHover");
             statusEl.className = "";
             return;
         }
 
-        let prefix = isSessionActive ? t("prefNormal") : t("prefTest");\n        let activeClassDistract = isSessionActive ? "grace-period" : "";
+        let activeClassDistract = isSessionActive ? "grace-period" : "";
         let activeClassPFocus = isSessionActive ? "focus-paper" : "";
         let activeClassSFocus = isSessionActive ? "focus-screen" : "";
-        
+        let prefix = isSessionActive ? "" : t("prefStandby");
 
         if (yawRatio < -THRESH_YAW) {
-            statusEl.innerText = prefix + t("yawR"); statusEl.className = activeClassDistract; instantIsDistracted = true;
+            statusEl.innerText = prefix + t("yawRight"); statusEl.className = activeClassDistract; instantIsDistracted = true;
         } else if (yawRatio > THRESH_YAW) {
-            statusEl.innerText = prefix + t("yawL"); statusEl.className = activeClassDistract; instantIsDistracted = true;
+            statusEl.innerText = prefix + t("yawLeft"); statusEl.className = activeClassDistract; instantIsDistracted = true;
         } else if (pitchRatio < THRESH_UP) { 
-            statusEl.innerText = prefix + t("pitchU"); statusEl.className = activeClassDistract; instantIsDistracted = true;
+            statusEl.innerText = prefix + t("pitchUp"); statusEl.className = activeClassDistract; instantIsDistracted = true;
         } else if (isGazeWandering) {
-            statusEl.innerText = prefix + t("gazeW"); statusEl.className = activeClassDistract; instantIsDistracted = true;
+            statusEl.innerText = prefix + t("gazeWander"); statusEl.className = activeClassDistract; instantIsDistracted = true;
         } else if (pitchRatio > THRESH_DOWN) { 
-            statusEl.innerText = prefix + t("pitchD"); statusEl.className = activeClassPFocus; instantIsDistracted = false;
+            statusEl.innerText = prefix + t("focusPaper"); statusEl.className = activeClassPFocus; instantIsDistracted = false;
         } else {
-            statusEl.innerText = prefix + t("focusS"); statusEl.className = activeClassSFocus; instantIsDistracted = false;
+            statusEl.innerText = prefix + t("focusScreen"); statusEl.className = activeClassSFocus; instantIsDistracted = false;
         }
 
         processStateMachine(instantIsDistracted, "");
@@ -894,13 +931,14 @@
         
       } else {
         if (!isSessionPaused) {
-            statusEl.innerText = isSessionActive ? t("errAbsent") : t("errDetect");
+            statusEl.innerText = isSessionActive ? t("errAbsent") : t("errStandby");
             statusEl.className = isSessionActive ? "distracted" : "";
             processStateMachine(true, "");
         }
       }
     }
 
+    /* Apply translations on load, then start camera */
     applyTranslations();
     const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
