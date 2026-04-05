@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>学习辅助系统 (Web PoC)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
+    h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
+    #videoElement { display: none; }
+    
+    canvas { width: auto; max-width: 100%; max-height: 55vh; border-radius: 12px; border: 4px solid #16213e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    
+    #status { font-size: 2em; margin-top: 10px; font-weight: 800; padding: 15px; border-radius: 10px; display: inline-block; background-color: #0f3460; box-shadow: 0 4px 6px rgba(0,0,0,0.3);}
+    #timerStatus { font-size: 1.2em; color: #f39c12; margin-top: 10px; font-weight: bold; min-height: 30px;}
+    
+    .focus-screen { color: #4cd137; }
+    .focus-paper { color: #fbc531; }
+    .distracted { color: #e84118; animation: pulse 1s infinite; }
+    .grace-period { color: #f39c12; }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    #settingsPanel {
+      position: fixed; 
+      top: 20px; 
+      right: 20px;
+      background: rgba(15, 52, 96, 0.95); 
+      padding: 15px; 
+      border-radius: 12px; 
+      text-align: left;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+      border: 2px solid #e94560;
+      width: 260px;
+      z-index: 50;
+      transition: opacity 0.3s;
+    }
+    #settingsPanel input[type=range], #settingsPanel select { width: 100%; margin-bottom: 10px; }
+    #settingsPanel label { font-weight: bold; font-size: 13px; }
+    
+    .control-btn { background: #4cd137; border: 2px solid transparent; color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; margin: 0 10px 15px 10px; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);}
+    .control-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+    .control-btn.secondary { background: #e94560; }
+    .control-btn.start { background: #20bf6b; font-size: 18px; border: 2px solid #fff;}
+    
+    .record-btn { background: #4cd137; border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 5px; }
+    .record-btn:disabled { background: #555; cursor: not-allowed; }
+
+    #blackoutScreen {
+        display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; cursor: none;
+    }
+
+    .modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0f3460; z-index: 99999; flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; padding: 40px 20px; box-sizing: border-box;
+    }
+    
+    #historyTable th, #historyTable td { border: 1px solid #ddd; text-align: center; }
+  </style>
+</head>
+<body>
+  
+  <div id="historyModal" class="modal-overlay">
+    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;">📊 长期记录与评估档案</h1>
+    <div style="margin:20px 0;">
+      <button class="control-btn" style="background:#fbc531; color: #111;" onclick="exportCSV()">⬇️ 导出为表格文件 (.csv)</button>
+      <button class="control-btn secondary" onclick="closeHistory()">返回监控大厅</button>
+    </div>
+    
+    <div style="width: 90%; max-width: 900px; margin: 0 auto; background: #1a1a2e; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+       <h3 style="color:#fff; margin-top:0; border-bottom: 1px solid #444; padding-bottom:10px; text-align: left;">📉 近期连续得分波动（动态趋势）</h3>
+       <div id="trendChart" style="height: 180px; display:flex; align-items:flex-end; gap: 4px; padding-top: 20px; overflow-x: auto; border-bottom: 1px solid #555;"></div>
+    </div>
+
+    <div style="width: 90%; max-width: 900px; margin: 20px auto;">
+      <table id="historyTable" style="width:100%; border-collapse: collapse; background: #fff; color: #111; border-radius: 8px; overflow:hidden;">
+         <thead>
+           <tr style="background:#ddd;"><th style="padding:15px;">打卡日期</th><th>系统追踪时长</th><th>专注得分评估</th><th>🟩 无瑕疵专注</th><th>🟨 缓冲包容期</th><th>🟥 严重分心报警</th></tr>
+         </thead>
+         <tbody style="font-size: 15px;"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="reportModal" class="modal-overlay">
+    <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;">🏆 专注力挑战成绩单 🏆</h1>
+    <h2 id="finalScore" style="color:#fbc531; font-size: 3em; margin: 10px 0;">专注得分: 100</h2>
+    <p id="timeSummary" style="color: #ccc; font-size: 1.2em;">总计训练时长: 15分钟</p>
+
+    <div style="width: 90%; max-width: 800px; margin: 20px 0; background: #1a1a2e; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <h3 style="color:#fff; margin-top:0; text-align:left;">📈 宏观专注热点波状图</h3>
+      <div id="timelineCanvas" style="display:flex; height: 40px; width: 100%; border-radius: 5px; overflow: hidden; background: #222;"></div>
+      <div style="margin-top:15px; font-size: 14px; text-align: left; display:flex; justify-content:space-between; color:#aaa;">
+        <span>🟩 专注的时长</span>
+        <span>🟨 有效的停顿缓冲</span>
+        <span>🟥 思想开小差受罚</span>
+        <span>⬜ 合理喝水休息</span>
+      </div>
+    </div>
+
+    <div id="highlightContainer" style="display:none; width: 90%; max-width: 500px; margin: 20px 0; background: #fff; padding: 15px 15px 40px 15px; border-radius: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: rotate(-2deg);">
+      <img id="highlightImg" src="" style="width: 100%; border: 1px solid #ddd; object-fit: cover; max-height: 400px;"/>
+      <h3 style="color:#2d3436; margin: 20px 0 0 0; font-family: 'Kaiti', '楷体', serif; font-size: 22px;">✨ 看！你全神贯注思考的样子多棒！✨</h3>
+    </div>
+
+    <button class="control-btn" onclick="closeReport()" style="margin-top: 30px; font-size: 1.2em; padding: 15px 30px; border-radius: 30px;">记录并返回主界面</button>
+  </div>
+
+  <div id="blackoutScreen">
+      <h1 style="font-size: 2em; opacity: 0.15; color: #fff;">沉浸护眼陪伴模式</h1>
+      <p style="opacity: 0.1; color: #fff;">（此时 AI 大脑正在后台完全静默守护，按键盘左上角 ESC 键可退出）</p>
+  </div>
+
+  <h2>学习辅助系统 - 专注伴读仪</h2>
+  
+  <!-- 控制台重塑：增加了暂停按钮 -->
+  <div>
+      <button class="control-btn start" onclick="toggleSession()" id="sessionBtn">▶️ 开始专注打卡学习 (进入记录模式)</button>
+      <button class="control-btn" style="background:#555; display:none;" onclick="togglePause()" id="pauseBtn">⏸️ 临时休息/离开座位</button>
+      <br>
+      <button class="control-btn" onclick="toggleScreen()" id="screenBtn">👁️ 开启全电脑极致黑屏模式</button>
+      <button class="control-btn secondary" onclick="toggleSettings()">⚙️ 展开校准面板</button>
+      <button class="control-btn" style="background:#fbc531; color:#111;" onclick="showHistory()">📊 全局历史评估档案</button>
+  </div>
+  
+  <div style="position: relative; display: inline-block; width: 100%;">
+    <video id="videoElement" autoplay playsinline></video>
+    <canvas id="canvasElement" width="640" height="480"></canvas>
+    
+    <div id="settingsPanel" style="display: none;">
+      <h4 style="margin-top:0; color: #fff; border-bottom: 1px solid #fff; padding-bottom: 5px;">🎯 系统与灵敏度设定</h4>
+      
+      <label>🏅 高光抓拍奖励里程碑:</label>
+      <select id="sliderMilestone" onchange="updateThresh()" style="border-radius:4px;">
+        <option value="15">🧪 演示测试模式 (连续达标 15秒)</option>
+        <option value="300">🥉 进步青铜 (连续达标 5分钟)</option>
+        <option value="600">🥈 坚定白银 (连续达标 10分钟)</option>
+        <option value="900" selected>🥇 优秀黄金 (连续达标 15分钟)</option>
+        <option value="1800">💎 王者钻石 (连续达标 30分钟)</option>
+      </select>
+
+      <label>容忍思考时间: <span id="valGrace" style="color:#fbc531;">10</span> 秒</label><br>
+      <input type="range" id="sliderGrace" min="3" max="30" step="1" value="10" oninput="updateThresh()">
+      
+      <label>抬头判罚阈值 (<span id="valUp" style="color:#e94560;">0.25</span>): </label>
+      <input type="range" id="sliderUp" min="0.0" max="0.5" step="0.01" value="0.25" oninput="updateThresh()">
+      <label>低头阅读阈值 (<span id="valDown" style="color:#4cd137;">0.50</span>): </label>
+      <input type="range" id="sliderDown" min="0.2" max="0.8" step="0.01" value="0.50" oninput="updateThresh()">
+      <label>偏头判罚阈值 (<span id="valYaw" style="color:#fbc531;">0.22</span>): </label>
+      <input type="range" id="sliderYaw" min="0.1" max="0.5" step="0.01" value="0.22" oninput="updateThresh()">
+      <label>斜视判定阈值 (偏差 > <span id="valGaze" style="color:#1e90ff;">0.18</span>): </label>
+      <input type="range" id="sliderGaze" min="0.05" max="0.40" step="0.01" value="0.18" oninput="updateThresh()">
+
+      <hr style="border-top:1px dashed #777; margin:15px 0;">
+      <label>🎙️ 录制专属家长语音助手:</label><br>
+      <button class="record-btn" id="recordBtn" onclick="toggleRecording()">🔴 开始录音 (5秒内)</button>
+      <button class="record-btn" id="playBtn" onclick="playCustomAudio()" disabled>▶️ 试听刚录的语音</button>
+
+      <hr style="border-top:1px dashed #777; margin:15px 0;">
+      <label>🎵 学习沉浸背景音 (白噪音/音乐):</label><br>
+      <input type="file" id="bgmUpload" accept="audio/mpeg, audio/mp3, audio/wav, audio/ogg" style="width: 100%; color:#aaa; font-size:12px; margin-bottom:5px;" onchange="loadBGM(this)">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <label style="font-size:12px; color:#ccc;">BGM音量:</label>
+          <input type="range" id="bgmVolume" min="0.0" max="1.0" step="0.01" value="0.20" style="width:65%; margin:0;" oninput="updateBGMVolume()">
+      </div>
+    </div>
+  </div>
+
+  <br>
+  <!-- 在未点击开始前，UI提示处于待机/校准状态 -->
+  <div id="status" style="border: 2px dashed #e94560; color: #aaa;">💡 请先调整摄像头角度进行校准（尚未开始打卡计分）</div>
+  <div id="timerStatus"></div>
+
+  <script>
+    const videoElement = document.getElementById('videoElement');
+    const canvasElement = document.getElementById('canvasElement');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const timerStatusEl = document.getElementById('timerStatus');
+
+    /* ----- HISTORY PERMANENT DATABASE (localStorage) ----- */
+    function saveSessionToHistory(durationSecs, score, green, yellow, red) {
+        let histStr = localStorage.getItem('adhd_study_history');
+        let history = histStr ? JSON.parse(histStr) : [];
+        let now = new Date();
+        let dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + " " + String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
+        let dStr = Math.floor(durationSecs / 60) + "分" + (durationSecs % 60) + "秒";
+
+        history.push({
+            date: dateStr, duration: durationSecs, durationFmt: dStr, score: score,
+            green: green, yellow: yellow, red: red
+        });
+        localStorage.setItem('adhd_study_history', JSON.stringify(history));
+    }
+
+    function showHistory() {
+        document.getElementById('historyModal').style.display = 'flex';
+        let histStr = localStorage.getItem('adhd_study_history');
+        let history = histStr ? JSON.parse(histStr) : [];
+        let tbody = document.querySelector('#historyTable tbody');
+        let trendChart = document.getElementById('trendChart');
+        tbody.innerHTML = '';
+        trendChart.innerHTML = '';
+        
+        if (history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;">暂无历史打卡记录</td></tr>`;
+            return;
+        }
+
+        let reversedHistory = [...history].reverse();
+        reversedHistory.forEach(h => {
+            let tr = document.createElement('tr');
+            tr.style.borderBottom = "1px solid #eee";
+            tr.innerHTML = `<td style="padding:15px;">${h.date}</td><td>${h.durationFmt}</td><td style="font-weight:bold; color:${h.score >= 80 ? '#20bf6b' : (h.score >= 50 ? '#fbc531' : '#eb3b5a')}; font-size:1.2em;">${h.score}分</td><td style="color:#20bf6b;">${h.green} 秒</td><td style="color:#d35400;">${h.yellow} 秒</td><td style="color:#eb3b5a; font-weight:bold;">${h.red} 秒</td>`;
+            tbody.appendChild(tr);
+        });
+
+        let chartData = history.slice(-50);
+        chartData.forEach(h => {
+            let barWrapper = document.createElement('div');
+            barWrapper.style.flex = "1"; barWrapper.style.display = "flex"; barWrapper.style.flexDirection = "column"; barWrapper.style.alignItems = "center"; barWrapper.style.justifyContent = "flex-end"; barWrapper.style.minWidth = "15px";
+
+            let text = document.createElement('div');
+            text.innerText = h.score;
+            text.style.color = "#ccc"; text.style.fontSize = "11px"; text.style.marginBottom = "5px";
+
+            let bar = document.createElement('div');
+            bar.style.width = "100%"; bar.style.height = h.score + "%";
+            bar.style.background = h.score >= 80 ? "#20bf6b" : (h.score >= 50 ? "#fbc531" : "#eb3b5a");
+            bar.style.borderRadius = "3px 3px 0 0";
+
+            barWrapper.appendChild(text); barWrapper.appendChild(bar); trendChart.appendChild(barWrapper);
+        });
+    }
+
+    function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+
+    function exportCSV() {
+        let histStr = localStorage.getItem('adhd_study_history');
+        if(!histStr) { alert("暂无数据可供导出哦！"); return; }
+        let history = JSON.parse(histStr);
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+        csvContent += "日期,坚持总时长(纯秒数),总体专注得分,完美专注积累(秒),容忍思考总时长(秒),走神被警告时长(秒)\r\n";
+        history.forEach(h => {
+            csvContent += `${h.date},${h.duration},${h.score},${h.green},${h.yellow},${h.red}\r\n`;
+        });
+        let encodedUri = encodeURI(csvContent);
+        let link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "历史评估档案.csv");
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    /* ----- SESSION & ANALYTICS CONTROL ----- */
+    let isSessionActive = false;
+    let isSessionPaused = false; // 新增：暂停能力
+    let sessionLog = [];
+    let sessionInterval = null;
+    let continuousFocusSec = 0;
+    let highlightImageBase64 = null;
+
+    // 状态机核心参数
+    let globalState = "FOCUSED";
+    let distractionStartTime = 0;
+    let lastVoiceWarningTime = 0;
+    
+    function toggleSession() {
+        const btn = document.getElementById('sessionBtn');
+        const pBtn = document.getElementById('pauseBtn');
+        if (!isSessionActive) {
+            isSessionActive = true;
+            isSessionPaused = false;
+            sessionLog = [];
+            continuousFocusSec = 0;
+            highlightImageBase64 = null;
+            
+            if (bgmAudio.src) {
+                bgmAudio.play().catch(e => console.log("BGM Playback Failed:", e));
+            }
+            
+            btn.innerText = "⏹️ 结束本次专注学习并生成复盘战报";
+            btn.style.background = "#eb3b5a";
+            btn.style.borderColor = "#c23616";
+            document.getElementById('settingsPanel').style.opacity = "0.5";
+            
+            pBtn.style.display = "inline-block";
+            pBtn.innerText = "⏸️ 临时休息 (可按空格键)";
+            pBtn.style.background = "#555";
+
+            statusEl.style.border = "none"; 
+            
+            sessionInterval = setInterval(() => {
+                if (isSessionPaused) {
+                    sessionLog.push("PAUSED"); // 在数组里记录下这段空白历史
+                    return; // 暂停时不计入得分和高光时间，不拉响警报
+                }
+
+                sessionLog.push(globalState);
+
+                if (globalState === "FOCUSED") {
+                    continuousFocusSec++;
+                } else if (globalState === "ALARM") { 
+                    continuousFocusSec = 0; 
+                }
+                
+                if (continuousFocusSec > THRESH_MILESTONE && !highlightImageBase64) {
+                    try { highlightImageBase64 = canvasElement.toDataURL("image/jpeg", 0.95); } catch (e) { }
+                }
+            }, 1000);
+        } else {
+            isSessionActive = false;
+            isSessionPaused = false;
+            clearInterval(sessionInterval);
+            
+            btn.innerText = "▶️ 开始专注打卡学习 (进入记录模式)";
+            btn.style.background = "#20bf6b";
+            btn.style.borderColor = "#fff";
+            document.getElementById('settingsPanel').style.opacity = "1";
+            pBtn.style.display = "none";
+            
+            bgmAudio.pause();
+            
+            statusEl.style.border = "2px dashed #e94560"; 
+            statusEl.style.color = "#aaa";
+            timerStatusEl.innerText = "";
+            
+            generateReportUI();
+        }
+    }
+
+    function togglePause() {
+        if (!isSessionActive) return;
+        isSessionPaused = !isSessionPaused;
+        const pBtn = document.getElementById('pauseBtn');
+        if (isSessionPaused) {
+            // 切入休息状态
+            pBtn.innerText = "▶️ 休息结束，立刻恢复打卡监控";
+            pBtn.style.background = "#20bf6b";
+            statusEl.innerText = "⏸️ 系统已暂停监控数据，放心喝水去吧！";
+            statusEl.className = "";
+            timerStatusEl.innerText = "";
+            bgmAudio.pause();
+        } else {
+            // 恢复
+            pBtn.innerText = "⏸️ 临时休息 (可按空格键)";
+            pBtn.style.background = "#555";
+            globalState = "FOCUSED"; // reset缓冲一下免得刚回来就报警
+            if (bgmAudio.src) bgmAudio.play().catch(e=>console.log(e));
+        }
+    }
+
+    function generateReportUI() {
+        if (sessionLog.length < 5) return alert("体验太短啦！没有足够的数据建模型。");
+
+        isScreenHidden = false;
+        document.getElementById('blackoutScreen').style.display = 'none';
+        document.getElementById('reportModal').style.display = 'flex';
+
+        let totalSecs = sessionLog.length;
+        let timeMins = Math.floor(totalSecs / 60);
+        let remainSecs = totalSecs % 60;
+        document.getElementById('timeSummary').innerText = `本次挂机累计时间: ${timeMins}分 ${remainSecs}秒`;
+
+        let greenCount = 0;
+        let yellowCount = 0;
+        let redCount = 0;
+        let pauseCount = 0;
+        
+        const timeline = document.getElementById('timelineCanvas');
+        timeline.innerHTML = '';
+        
+        sessionLog.forEach(state => {
+            let block = document.createElement('div');
+            block.style.flex = "1"; 
+            if (state === "FOCUSED") { block.style.background = "#20bf6b"; greenCount++; }
+            else if (state === "GRACE_PERIOD") { block.style.background = "#fbc531"; yellowCount++; }
+            else if (state === "PAUSED") { block.style.background = "#ecf0f1"; pauseCount++; }
+            else { block.style.background = "#eb3b5a"; redCount++; }
+            timeline.appendChild(block);
+        });
+
+        // 计分只针对那些“没有暂停真实在学”的时间基数，如果都在暂停那没意义
+        let activeTime = totalSecs - pauseCount;
+        if(activeTime <= 0) activeTime = 1;
+        let redRatio = redCount / activeTime; 
+        
+        let score = Math.floor(100 - (redRatio * 300)); 
+        if (score > 100) score = 100;
+        if (score < 10) score = 10; 
+        
+        document.getElementById('finalScore').innerText = `专注得分: ${score} 分`;
+
+        if (highlightImageBase64) {
+            document.getElementById('highlightContainer').style.display = 'block';
+            document.getElementById('highlightImg').src = highlightImageBase64;
+        } else {
+            document.getElementById('highlightContainer').style.display = 'none';
+        }
+
+        saveSessionToHistory(totalSecs, score, greenCount, yellowCount, redCount);
+    }
+
+    function closeReport() { document.getElementById('reportModal').style.display = 'none'; }
+
+    /* ----- UI Control Variables ----- */
+    let isScreenHidden = false;
+    let isSettingsOpen = false;
+
+    document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement) {
+            isScreenHidden = false;
+            document.getElementById('blackoutScreen').style.display = 'none';
+            document.getElementById('screenBtn').innerText = "👁️ 开启全电脑极致黑屏模式";
+            statusEl.style.visibility = "visible";
+            timerStatusEl.style.visibility = "visible";
+        }
+    });
+
+    // 全局快捷键监听：空格键一键暂停
+    document.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && isSessionActive) {
+            // 防止在调节数值或者输入框时误触
+            if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT") return;
+            e.preventDefault(); // 防止网页往下滚
+            togglePause();
+        }
+    });
+
+    function toggleScreen() {
+        const btn = document.getElementById('screenBtn');
+        if(!isScreenHidden) {
+            document.documentElement.requestFullscreen().catch(() => {});
+            isScreenHidden = true;
+            document.getElementById('blackoutScreen').style.display = 'flex';
+            statusEl.style.visibility = "hidden";
+            timerStatusEl.style.visibility = "hidden";
+        } else {
+            if (document.fullscreenElement) document.exitFullscreen();
+        }
+    }
+
+    function toggleSettings() {
+        isSettingsOpen = !isSettingsOpen;
+        const panel = document.getElementById('settingsPanel');
+        panel.style.display = isSettingsOpen ? "block" : "none";
+    }
+
+    /* ----- Thresh & Setup ----- */
+    let THRESH_UP = 0.25, THRESH_DOWN = 0.50, THRESH_YAW = 0.22, THRESH_GAZE = 0.18, GRACE_PERIOD_MS = 10000, THRESH_MILESTONE = 900; 
+
+    function updateThresh() {
+        THRESH_UP = parseFloat(document.getElementById('sliderUp').value);
+        THRESH_DOWN = parseFloat(document.getElementById('sliderDown').value);
+        THRESH_YAW = parseFloat(document.getElementById('sliderYaw').value);
+        THRESH_GAZE = parseFloat(document.getElementById('sliderGaze').value);
+        GRACE_PERIOD_MS = parseInt(document.getElementById('sliderGrace').value) * 1000;
+        THRESH_MILESTONE = parseInt(document.getElementById('sliderMilestone').value);
+        
+        document.getElementById('valUp').innerText = THRESH_UP.toFixed(2);
+        document.getElementById('valDown').innerText = THRESH_DOWN.toFixed(2);
+        document.getElementById('valYaw').innerText = THRESH_YAW.toFixed(2);
+        document.getElementById('valGaze').innerText = THRESH_GAZE.toFixed(2);
+        document.getElementById('valGrace').innerText = GRACE_PERIOD_MS / 1000;
+    }
+
+    // ----- Audio Recording & BGM -----
+    let mediaRecorder, audioChunks = [], customAudioUrl = null, customAudio = new Audio();
+    
+    let bgmAudio = new Audio();
+    bgmAudio.loop = true;
+    bgmAudio.volume = 0.20;
+
+    function loadBGM(inputElem) {
+        if (inputElem.files && inputElem.files[0]) {
+            if (bgmAudio.src && bgmAudio.src.includes('blob:')) URL.revokeObjectURL(bgmAudio.src); 
+            bgmAudio.src = URL.createObjectURL(inputElem.files[0]);
+        }
+    }
+
+    function updateBGMVolume() {
+        if (bgmAudio) bgmAudio.volume = parseFloat(document.getElementById('bgmVolume').value);
+    }
+
+    async function toggleRecording() {
+        const btn = document.getElementById('recordBtn');
+        if (btn.innerText.includes("开始") || btn.innerText.includes("重新")) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    customAudioUrl = URL.createObjectURL(audioBlob);
+                    customAudio.src = customAudioUrl;
+                    document.getElementById('playBtn').disabled = false;
+                    btn.innerText = "🔴 重新录音";
+                    stream.getTracks().forEach(t => t.stop()); 
+                };
+                mediaRecorder.start();
+                btn.innerText = "⏹️ 停止录制 (正在录音...)";
+                btn.style.background = "#e84118";
+                
+                setTimeout(() => { if(mediaRecorder && mediaRecorder.state === 'recording') toggleRecording(); }, 5000);
+            } catch (err) { alert("无法获取权限！"); }
+        } else if (btn.innerText.includes("停止")) {
+            mediaRecorder.stop();
+            btn.style.background = "#4cd137";
+        }
+    }
+
+    // 全局懒加载 AudioContext 防止在识别循环中创建导致 WebGL 崩溃
+    let sharedAudioCtx = null;
+    document.body.addEventListener('click', () => {
+        try {
+            if (!sharedAudioCtx) {
+                const Context = window.AudioContext || window.webkitAudioContext;
+                sharedAudioCtx = new Context();
+            }
+            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+        } catch (e) {}
+    });
+
+    function playCustomAudio() { if (customAudioUrl) { customAudio.currentTime = 0; customAudio.play(); } }
+
+    function playWarningSequence() {
+        if (isSessionPaused) return; 
+        
+        try {
+            if (!sharedAudioCtx) return; // 若用户全程未产生任何点击，按浏览器规范注定无法发声
+            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(e => console.log(e));
+            
+            function beep(freq, delaySecs, durationSecs) {
+                setTimeout(() => {
+                    try {
+                        if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+                        let osc = sharedAudioCtx.createOscillator();
+                        let gainNode = sharedAudioCtx.createGain();
+                        osc.connect(gainNode);
+                        gainNode.connect(sharedAudioCtx.destination);
+                        osc.type = "sine";
+                        osc.frequency.value = freq;
+                        gainNode.gain.value = 0.2; 
+                        
+                        osc.start();
+                        osc.stop(sharedAudioCtx.currentTime + durationSecs);
+                    } catch (e) { }
+                }, delaySecs * 1000);
+            }
+
+            beep(700, 0, 0.15); 
+            beep(700, 0.35, 0.15); 
+            beep(700, 0.70, 0.15);
+        } catch (err) { }
+
+        setTimeout(() => { 
+            try {
+                if (customAudioUrl && !isSessionPaused) { 
+                    customAudio.currentTime = 0; 
+                    customAudio.play().catch(e=>console.error(e)); 
+                } 
+            } catch (err) {}
+        }, 1100);
+    }
+
+    function triggerVoiceWarning() {
+        if (isSessionPaused) return; 
+        let now = Date.now();
+        if (now - lastVoiceWarningTime > 10000) { 
+            try { playWarningSequence(); } catch (err) {}
+            lastVoiceWarningTime = now; 
+        }
+    }
+
+    function processStateMachine(instantIsDistracted, instantActionName) {
+        if (isSessionPaused) return; // 暂停不处理状态分发
+        
+        let now = Date.now();
+        if (!instantIsDistracted) {
+            globalState = "FOCUSED"; distractionStartTime = null; timerStatusEl.innerText = ""; return;
+        }
+        if (globalState === "FOCUSED") {
+            globalState = "GRACE_PERIOD"; distractionStartTime = now;
+        } else if (globalState === "GRACE_PERIOD") {
+            let elapsed = now - distractionStartTime;
+            let timeDiffMs = GRACE_PERIOD_MS - elapsed;
+            if (timeDiffMs <= 0) {
+                globalState = "ALARM"; triggerVoiceWarning(); 
+                timerStatusEl.innerHTML = `🚫 警报已经触发：请迅速恢复专注状态！`;
+            } else {
+                let secLeft = Math.ceil(timeDiffMs / 1000);
+                timerStatusEl.innerHTML = `⚠️ 注意力漂移监测中：倒计时 <b style="color:#e94560; font-size:1.5em;">${secLeft}</b> 秒之后触发纠正指令`;
+            }
+        } else if (globalState === "ALARM") {
+            triggerVoiceWarning(); // 确保持续走神时能够反复触发警报
+            timerStatusEl.innerHTML = `🚫 警报持续触发：请迅速恢复您的专注状态！`;
+        }
+    }
+
+    // ----- Vision AI Rendering -----
+    function onResults(results) {
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      
+      canvasCtx.save();
+      canvasCtx.translate(canvasElement.width, 0);
+      canvasCtx.scale(-1, 1);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.restore(); 
+
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+        const nose = landmarks[1], leftEye = landmarks[33], rightEye = landmarks[263];
+        const faceWidth = Math.abs(rightEye.x - leftEye.x);
+        const eyeCenterX = (leftEye.x + rightEye.x) / 2;
+        const yawDist = nose.x - eyeCenterX;
+        const yawRatio = yawDist / faceWidth;
+        const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+        const pitchDist = nose.y - eyeCenterY; 
+        const pitchRatio = pitchDist / faceWidth; 
+        const leftIris = landmarks[468], rightIris = landmarks[473];
+
+        let isGazeWandering = false;
+        let irisRatio = 0.5;
+        if (leftIris) {
+            const leftEyeInner = landmarks[133], leftEyeOuter = landmarks[33];
+            irisRatio = Math.abs(leftIris.x - leftEyeInner.x) / Math.abs(leftEyeOuter.x - leftEyeInner.x);
+            if (Math.abs(irisRatio - 0.5) > THRESH_GAZE) isGazeWandering = true;
+        }
+
+        canvasCtx.save(); canvasCtx.translate(canvasElement.width, 0); canvasCtx.scale(-1, 1);
+        canvasCtx.fillStyle = '#1e90ff'; canvasCtx.beginPath(); canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 8, 0, 2 * Math.PI); canvasCtx.fill();
+        
+        canvasCtx.fillStyle = '#00ff00'; canvasCtx.beginPath();
+        if(leftIris) {
+            canvasCtx.moveTo(leftIris.x * canvasElement.width, leftIris.y * canvasElement.height);
+            canvasCtx.arc(leftIris.x * canvasElement.width, leftIris.y * canvasElement.height, 4, 0, 2 * Math.PI); 
+        }
+        if(rightIris) {
+            canvasCtx.moveTo(rightIris.x * canvasElement.width, rightIris.y * canvasElement.height);
+            canvasCtx.arc(rightIris.x * canvasElement.width, rightIris.y * canvasElement.height, 4, 0, 2 * Math.PI); 
+        }
+        canvasCtx.fill(); canvasCtx.restore();
+        
+        let instantIsDistracted = false;
+
+        // 【如果系统被暂停，直接强行阻断所有渲染反馈】
+        if (isSessionPaused) {
+            statusEl.innerText = "⏸️ 正常休息/上厕所 (守护悬停中...)";
+            statusEl.className = "";
+            return;
+        }
+
+        let activeClassDistract = isSessionActive ? "grace-period" : "";
+        let activeClassPFocus = isSessionActive ? "focus-paper" : "";
+        let activeClassSFocus = isSessionActive ? "focus-screen" : "";
+        let prefix = isSessionActive ? "" : "[待机测试] ";
+
+        if (yawRatio < -THRESH_YAW) {
+            statusEl.innerText = prefix + "👀 瞬间偏移：东张西望 (偏右)"; statusEl.className = activeClassDistract; instantIsDistracted = true;
+        } else if (yawRatio > THRESH_YAW) {
+            statusEl.innerText = prefix + "👀 瞬间偏移：东张西望 (偏左)"; statusEl.className = activeClassDistract; instantIsDistracted = true;
+        } else if (pitchRatio < THRESH_UP) { 
+            statusEl.innerText = prefix + "👀 瞬间偏移：抬头望天/后仰"; statusEl.className = activeClassDistract; instantIsDistracted = true;
+        } else if (isGazeWandering) {
+            statusEl.innerText = prefix + "🙄 瞬间偏移：眼神飘忽跑神"; statusEl.className = activeClassDistract; instantIsDistracted = true;
+        } else if (pitchRatio > THRESH_DOWN) { 
+            statusEl.innerText = prefix + "📖 保持专注：纸质桌前阅读时间"; statusEl.className = activeClassPFocus; instantIsDistracted = false;
+        } else {
+            statusEl.innerText = prefix + "💻 保持专注：电子屏幕网课学习"; statusEl.className = activeClassSFocus; instantIsDistracted = false;
+        }
+
+        processStateMachine(instantIsDistracted, "");
+
+        if (!isScreenHidden && !isSessionPaused) {
+            canvasCtx.fillStyle = "white"; canvasCtx.font = "bold 20px Arial"; canvasCtx.strokeStyle = "rgba(0,0,0,0.8)"; canvasCtx.lineWidth = 5;
+            canvasCtx.strokeText("PitchRange: " + pitchRatio.toFixed(2), 20, 30); canvasCtx.fillText("PitchRange: " + pitchRatio.toFixed(2), 20, 30);
+            canvasCtx.strokeText("YawRange: " + Math.abs(yawRatio).toFixed(2), 20, 60); canvasCtx.fillText("YawRange: " + Math.abs(yawRatio).toFixed(2), 20, 60);
+            canvasCtx.strokeText("IrisGaze: " + irisRatio.toFixed(2), 20, 90); canvasCtx.fillText("IrisGaze: " + irisRatio.toFixed(2), 20, 90);
+            
+            if (isSessionActive) {
+                canvasCtx.fillStyle = "#fbc531";
+                let progStr = highlightImageBase64 ? "已完成盲拍！" : `${continuousFocusSec}s / ${THRESH_MILESTONE}s`;
+                canvasCtx.strokeText("高光进度: " + progStr, 20, 120); canvasCtx.fillText("高光进度: " + progStr, 20, 120);
+            }
+        }
+        
+      } else {
+        if (!isSessionPaused) {
+            statusEl.innerText = isSessionActive ? "🪑 严重异常：没看镜头或离开座位！" : "[待机] 离开主核心区域";
+            statusEl.className = isSessionActive ? "distracted" : "";
+            processStateMachine(true, "");
+        }
+      }
+    }
+
+    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    faceMesh.onResults(onResults);
+    new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
+  </script>
+</body>
+</html>
