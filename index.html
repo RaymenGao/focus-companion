@@ -95,8 +95,8 @@
 
   <div id="reportModal" class="modal-overlay">
     <h1 style="color: #fff; font-size: 2.5em; margin-bottom: 5px;" data-i18n="hReport">🏆 专注力挑战成绩单 🏆</h1>
-    <h2 id="finalScore" style="color:#fbc531; font-size: 3em; margin: 10px 0;">${t("scoreLabel")}100</h2>
-    <p id="timeSummary" style="color: #ccc; font-size: 1.2em;">${t("timeLabel")}15分钟</p>
+    <h2 id="finalScore" style="color:#fbc531; font-size: 3em; margin: 10px 0;">专注得分: 100</h2>
+    <p id="timeSummary" style="color: #ccc; font-size: 1.2em;">总计训练时长: 15分钟</p>
 
     <div style="width: 90%; max-width: 800px; margin: 20px 0; background: #1a1a2e; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
       <h3 style="color:#fff; margin-top:0; text-align:left;" data-i18n="hHeatmap">📈 宏观专注热点波状图</h3>
@@ -193,11 +193,11 @@
         hTrend: "📉 近期连续得分波动（动态趋势）",
         thDate: "打卡日期", thTime: "系统追踪时长", thScore: "专注得分评估", 
         thG: "🟩 无瑕疵专注", thY: "🟨 缓冲包容期", thR: "🟥 严重分心报警",
-        noHistory: t("noHistory"),
+        noHistory: "暂无历史打卡记录",
         hReport: "🏆 专注力挑战成绩单 🏆",
-        scoreLabel: "${t("scoreLabel")}",
-        timeLabel: "${t("timeLabel")}",
-        minLabel: "分", secLabel: " " + t("secLabel"),
+        scoreLabel: "专注得分: ",
+        timeLabel: "总计训练时长: ",
+        minLabel: "分", secLabel: "秒",
         hHeatmap: "📈 宏观专注热点波状图",
         legG: "🟩 专注的时长", legY: "🟨 有效的停顿缓冲", legR: "🟥 思想开小差受罚", legW: "⬜ 合理喝水休息",
         hHighlight: "✨ 看！你全神贯注思考的样子多棒！✨",
@@ -241,7 +241,7 @@
         errCamera: "无法获取权限！",
         errTooShort: "体验太短啦！没有足够的数据建模型。",
         exportFail: "暂无数据可供导出哦！",
-        exportName: ""+t("exportName")+"",
+        exportName: "历史评估档案.csv",
         
         prefNormal: "",
         prefTest: "[待机测试] ",
@@ -411,7 +411,7 @@
         trendChart.innerHTML = '';
         
         if (history.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;">暂无历史打卡记录</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;">${t("noHistory")}</td></tr>`;
             return;
         }
 
@@ -567,7 +567,7 @@
         let totalSecs = sessionLog.length;
         let timeMins = Math.floor(totalSecs / 60);
         let remainSecs = totalSecs % 60;
-        document.getElementById('timeSummary').innerText = `本次挂机累计时间: ${timeMins}分 ${remainSecs}秒`;
+        document.getElementById('timeSummary').innerText = `${t("timeLabel")} ${timeMins}${t("minLabel")} ${remainSecs}${t("secLabel")}`;
 
         let greenCount = 0;
         let yellowCount = 0;
@@ -596,7 +596,7 @@
         if (score > 100) score = 100;
         if (score < 10) score = 10; 
         
-        document.getElementById('finalScore').innerText = `${t("scoreLabel")}${score} 分`;
+        document.getElementById('finalScore').innerText = `${t("scoreLabel")}${score}`;
 
         if (highlightImageBase64) {
             document.getElementById('highlightContainer').style.display = 'block';
