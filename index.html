@@ -8,7 +8,7 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
     h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
-    #videoElement { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; }
+    #videoElement { position: absolute; top: 0; left: 0; opacity: 0.001; pointer-events: none; z-index: -999; }
     
     canvas { width: auto; max-width: 100%; max-height: 55vh; border-radius: 12px; border: 4px solid #16213e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
@@ -1071,7 +1071,11 @@
       // The MediaPipe Camera utility handles getUserMedia internally.
       const camera = new Camera(videoElement, {
         onFrame: async () => {
-          try { await faceMesh.send({image: videoElement}); } catch(e) { /* ignore per-frame errors */ }
+          try { 
+            await faceMesh.send({image: videoElement}); 
+          } catch(e) { 
+            console.error('faceMesh.send error:', e); 
+          }
         },
         width: 640,
         height: 480
