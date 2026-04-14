@@ -8,7 +8,7 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
     h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
-    #videoElement { display: none; }
+    #videoElement { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; }
     
     canvas { width: auto; max-width: 100%; max-height: 55vh; border-radius: 12px; border: 4px solid #16213e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
@@ -70,9 +70,50 @@
       transition: 0.2s;
     }
     #langBtn:hover { background: #16213e; transform: scale(1.05); }
+    #loadingOverlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #1a1a2e; z-index: 999999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.5s;
+    }
+    #loadingOverlay .spinner {
+      width: 60px; height: 60px;
+      border: 6px solid #16213e;
+      border-top: 6px solid #e94560;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loadingOverlay p { color: #aaa; font-size: 1em; margin: 8px 0; max-width: 300px; line-height: 1.6; }
+    #loadingOverlay .load-title { color: #fff; font-size: 1.3em; font-weight: bold; margin-bottom: 4px; }
+    #errorOverlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #1a1a2e; z-index: 999999;
+      flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
+    }
+    #errorOverlay h2 { color: #e94560; } 
+    #errorOverlay p { color: #ccc; max-width: 360px; line-height: 1.7; }
+    #errorOverlay a { color: #4cd137; }
   </style>
 </head>
 <body>
+  <!-- Loading overlay shown while MediaPipe WASM initializes -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p class="load-title">🧠 AI 视觉引擎启动中</p>
+    <p>正在加载人脸识别模型（约 4MB）<br>首次加载需要 10~30 秒，请耐心等待<br><br>
+    <span style="color:#fbc531;">💡 请确保在浏览器弹出摄像头权限时点击「允许」</span></p>
+  </div>
+  <!-- Error overlay shown if MediaPipe fails (e.g. unsupported browser/device) -->
+  <div id="errorOverlay">
+    <h2>😢 设备不支持</h2>
+    <p>您的浏览器或设备可能不支持 WebGL2 / WebAssembly，无法运行 AI 人脸识别引擎。<br><br>
+    💡 建议尝试：<br>
+    • 手机使用 <b>Chrome 最新版</b> 打开<br>
+    • 或在电脑/平板上使用
+    </p>
+  </div>
   <button id="langBtn" onclick="toggleLanguage()">🌐 EN</button>
   
   <div id="historyModal" class="modal-overlay">
@@ -940,10 +981,56 @@
 
     /* Apply translations on load, then start camera */
     applyTranslations();
-    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    faceMesh.onResults(onResults);
-    new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
+
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loadingOverlay');
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.style.display = 'none'; }, 500);
+    }
+
+    function showErrorOverlay() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('errorOverlay').style.display = 'flex';
+    }
+
+    // Watchdog: if onResults never fires within 45s, show error
+    let modelReady = false;
+    const watchdogTimer = setTimeout(() => {
+      if (!modelReady) showErrorOverlay();
+    }, 45000);
+
+    function onResultsWrapper(results) {
+      if (!modelReady) {
+        modelReady = true;
+        clearTimeout(watchdogTimer);
+        hideLoadingOverlay();
+      }
+      onResults(results);
+    }
+
+    let faceMesh;
+    try {
+      faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+      faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      faceMesh.onResults(onResultsWrapper);
+
+      // Use facingMode:'user' to force front camera on mobile devices
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          try { await faceMesh.send({image: videoElement}); } catch(e) { /* ignore per-frame errors */ }
+        },
+        width: 640,
+        height: 480,
+        facingMode: 'user'
+      });
+      camera.start().catch(err => {
+        console.error('Camera start failed:', err);
+        showErrorOverlay();
+      });
+    } catch(err) {
+      console.error('MediaPipe init failed:', err);
+      showErrorOverlay();
+    }
   </script>
 </body>
 </html>
