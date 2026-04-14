@@ -1044,11 +1044,12 @@
       document.getElementById('errorOverlay').style.display = 'flex';
     }
 
-    // Watchdog: if onResults never fires within 45s, show error
+    // Watchdog: if onResults never fires within 120s, show error
+    // Use 120s to allow for slow CDN loads on mobile/tablet networks
     let modelReady = false;
     const watchdogTimer = setTimeout(() => {
       if (!modelReady) showErrorOverlay();
-    }, 45000);
+    }, 120000);
 
     function onResultsWrapper(results) {
       if (!modelReady) {
@@ -1065,18 +1066,22 @@
       faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       faceMesh.onResults(onResultsWrapper);
 
-      // Use facingMode:'user' to force front camera on mobile devices
+      // NOTE: Do NOT pass facingMode to MediaPipe Camera constructor —
+      // it's not a supported option and causes OverconstrainedError on iOS Safari.
+      // The MediaPipe Camera utility handles getUserMedia internally.
       const camera = new Camera(videoElement, {
         onFrame: async () => {
           try { await faceMesh.send({image: videoElement}); } catch(e) { /* ignore per-frame errors */ }
         },
         width: 640,
-        height: 480,
-        facingMode: 'user'
+        height: 480
       });
       camera.start().catch(err => {
+        // On camera failure, log and update loading text — don't hard-error immediately.
+        // The 120s watchdog will show the error page if things truly don't recover.
         console.error('Camera start failed:', err);
-        showErrorOverlay();
+        const loadingEl = document.querySelector('#loadingOverlay p:last-of-type');
+        if (loadingEl) loadingEl.innerHTML = '⚠️ 摄像头启动失败，请检查浏览器权限设置后刷新页面。<br>如问题持续，请尝试 Chrome 浏览器。';
       });
     } catch(err) {
       console.error('MediaPipe init failed:', err);
