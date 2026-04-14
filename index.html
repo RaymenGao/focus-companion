@@ -8,7 +8,7 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
     h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
-    #videoElement { position: absolute; top: 0; left: 0; opacity: 0.001; pointer-events: none; z-index: -999; }
+    #videoElement { display: none; }
     
     canvas { width: auto; max-width: 100%; max-height: 55vh; border-radius: 12px; border: 4px solid #16213e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
@@ -94,24 +94,21 @@
     }
     #errorOverlay h2 { color: #e94560; } 
     #errorOverlay p { color: #ccc; max-width: 360px; line-height: 1.7; }
-    #errorOverlay a { color: #4cd137; }
   </style>
 </head>
 <body>
-  <!-- Loading overlay shown while MediaPipe WASM initializes -->
   <div id="loadingOverlay">
     <div class="spinner"></div>
     <p class="load-title">🧠 AI 视觉引擎启动中</p>
     <p>正在加载人脸识别模型（约 4MB）<br>首次加载需要 10~30 秒，请耐心等待<br><br>
     <span style="color:#fbc531;">💡 请确保在浏览器弹出摄像头权限时点击「允许」</span></p>
   </div>
-  <!-- Error overlay shown if MediaPipe fails (e.g. unsupported browser/device) -->
   <div id="errorOverlay">
-    <h2>😢 设备不支持</h2>
-    <p>您的浏览器或设备可能不支持 WebGL2 / WebAssembly，无法运行 AI 人脸识别引擎。<br><br>
+    <h2>😢 设备加载失败</h2>
+    <p>您的浏览器可能不支持运行 AI 人脸识别引擎，或网络加载超时。<br><br>
     💡 建议尝试：<br>
-    • 手机使用 <b>Chrome 最新版</b> 打开<br>
-    • 或在电脑/平板上使用
+    • 刷新页面重试<br>
+    • 使用 <b>Chrome/Edge 最新版</b> 打开
     </p>
   </div>
   <button id="langBtn" onclick="toggleLanguage()">🌐 EN</button>
@@ -763,19 +760,6 @@
     bgmAudio.loop = true;
     bgmAudio.volume = 0.20;
 
-    // Detect best supported MIME type for audio recording (iOS needs mp4, PC/Android prefers webm)
-    function getRecordingMimeType() {
-        const types = [
-            'audio/webm;codecs=opus',
-            'audio/webm',
-            'audio/mp4',
-            'audio/ogg;codecs=opus',
-            'audio/ogg',
-            ''
-        ];
-        return types.find(t => !t || MediaRecorder.isTypeSupported(t)) || '';
-    }
-
     function loadBGM(inputElem) {
         if (inputElem.files && inputElem.files[0]) {
             if (bgmAudio.src && bgmAudio.src.includes('blob:')) URL.revokeObjectURL(bgmAudio.src); 
@@ -793,19 +777,12 @@
 
         if (state === 'idle' || state === 'done') {
             try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error('getUserMedia not supported');
-                }
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                const mimeType = getRecordingMimeType();
-                const options = mimeType ? { mimeType } : {};
-                mediaRecorder = new MediaRecorder(stream, options);
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
-                    // Use actual recorded MIME type for Blob so playback works on iOS
-                    const blobType = mediaRecorder.mimeType || mimeType || 'audio/webm';
-                    const audioBlob = new Blob(audioChunks, { type: blobType });
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     customAudioUrl = URL.createObjectURL(audioBlob);
                     customAudio.src = customAudioUrl;
                     document.getElementById('playBtn').disabled = false;
@@ -817,26 +794,18 @@
                 btn.dataset.recState = 'recording';
                 btn.innerText = t("btnRecStop");
                 btn.style.background = "#e84118";
+                
                 setTimeout(() => { if(mediaRecorder && mediaRecorder.state === 'recording') toggleRecording(); }, 5000);
-            } catch (err) {
-                console.error('Recording error:', err);
-                // iOS Safari/Chrome may block mic if camera stream is active; guide user
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                if (isIOS) {
-                    alert('iOS 提示：请在「设置 → Safari/Chrome → 麦克风」中确认已允许本网站使用麦克风权限，然后重试。');
-                } else {
-                    alert(t("errCamera"));
-                }
-            }
+            } catch (err) { alert(t("errCamera")); }
         } else if (state === 'recording') {
             mediaRecorder.stop();
             btn.style.background = "#4cd137";
         }
     }
 
-    // Lazy-init AudioContext — init on both click AND touch (mobile)
+    // Lazy-init AudioContext
     let sharedAudioCtx = null;
-    function ensureAudioCtx() {
+    document.body.addEventListener('click', () => {
         try {
             if (!sharedAudioCtx) {
                 const Context = window.AudioContext || window.webkitAudioContext;
@@ -844,58 +813,45 @@
             }
             if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
         } catch (e) {}
-    }
-    document.body.addEventListener('click', ensureAudioCtx);
-    document.body.addEventListener('touchstart', ensureAudioCtx, { passive: true });
-    document.body.addEventListener('touchend', ensureAudioCtx, { passive: true });
+    });
 
     function playCustomAudio() { if (customAudioUrl) { customAudio.currentTime = 0; customAudio.play(); } }
 
-    // playWarningSequence: fully async so AudioContext.resume() is properly awaited
-    // before oscillators are created — critical fix for mobile Chrome/Safari silence
-    async function playWarningSequence() {
-        if (isSessionPaused) return;
+    function playWarningSequence() {
+        if (isSessionPaused) return; 
         
         try {
-            // Create AudioContext if not yet initialized (e.g. first alarm)
-            if (!sharedAudioCtx) {
-                const Context = window.AudioContext || window.webkitAudioContext;
-                sharedAudioCtx = new Context();
-            }
-            // MUST await resume — mobile browsers suspend AudioContext aggressively
-            if (sharedAudioCtx.state === 'suspended') {
-                await sharedAudioCtx.resume();
-            }
-
-            // Async beep: each beep waits for context to be running before scheduling
-            async function beep(freq, delaySecs, durationSecs) {
-                await new Promise(resolve => setTimeout(resolve, delaySecs * 1000));
-                try {
-                    if (sharedAudioCtx.state === 'suspended') await sharedAudioCtx.resume();
-                    const osc = sharedAudioCtx.createOscillator();
-                    const gainNode = sharedAudioCtx.createGain();
-                    osc.connect(gainNode);
-                    gainNode.connect(sharedAudioCtx.destination);
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    gainNode.gain.value = 0.25;
-                    osc.start();
-                    osc.stop(sharedAudioCtx.currentTime + durationSecs);
-                } catch (e) { console.warn('beep error:', e); }
+            if (!sharedAudioCtx) return;
+            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(e => console.log(e));
+            
+            function beep(freq, delaySecs, durationSecs) {
+                setTimeout(() => {
+                    try {
+                        if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+                        let osc = sharedAudioCtx.createOscillator();
+                        let gainNode = sharedAudioCtx.createGain();
+                        osc.connect(gainNode);
+                        gainNode.connect(sharedAudioCtx.destination);
+                        osc.type = "sine";
+                        osc.frequency.value = freq;
+                        gainNode.gain.value = 0.2; 
+                        
+                        osc.start();
+                        osc.stop(sharedAudioCtx.currentTime + durationSecs);
+                    } catch (e) { }
+                }, delaySecs * 1000);
             }
 
-            // Fire all three beeps in parallel (each manages its own delay)
-            beep(700, 0,    0.15);
-            beep(700, 0.35, 0.15);
+            beep(700, 0, 0.15); 
+            beep(700, 0.35, 0.15); 
             beep(700, 0.70, 0.15);
-        } catch (err) { console.warn('playWarningSequence error:', err); }
+        } catch (err) { }
 
-        // Play custom voice after beeps
         setTimeout(() => { 
             try {
                 if (customAudioUrl && !isSessionPaused) { 
                     customAudio.currentTime = 0; 
-                    customAudio.play().catch(e => console.warn('custom audio play failed:', e)); 
+                    customAudio.play().catch(e=>console.error(e)); 
                 } 
             } catch (err) {}
         }, 1100);
@@ -1044,8 +1000,6 @@
       document.getElementById('errorOverlay').style.display = 'flex';
     }
 
-    // Watchdog: if onResults never fires within 120s, show error
-    // Use 120s to allow for slow CDN loads on mobile/tablet networks
     let modelReady = false;
     const watchdogTimer = setTimeout(() => {
       if (!modelReady) showErrorOverlay();
@@ -1060,35 +1014,25 @@
       onResults(results);
     }
 
-    let faceMesh;
     try {
-      faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+      const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
       faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       faceMesh.onResults(onResultsWrapper);
-
-      // NOTE: Do NOT pass facingMode to MediaPipe Camera constructor —
-      // it's not a supported option and causes OverconstrainedError on iOS Safari.
-      // The MediaPipe Camera utility handles getUserMedia internally.
+      
       const camera = new Camera(videoElement, {
         onFrame: async () => {
-          try { 
-            await faceMesh.send({image: videoElement}); 
-          } catch(e) { 
-            console.error('faceMesh.send error:', e); 
-          }
+          try { await faceMesh.send({image: videoElement}); } catch(e) {}
         },
         width: 640,
         height: 480
       });
       camera.start().catch(err => {
-        // On camera failure, log and update loading text — don't hard-error immediately.
-        // The 120s watchdog will show the error page if things truly don't recover.
         console.error('Camera start failed:', err);
         const loadingEl = document.querySelector('#loadingOverlay p:last-of-type');
-        if (loadingEl) loadingEl.innerHTML = '⚠️ 摄像头启动失败，请检查浏览器权限设置后刷新页面。<br>如问题持续，请尝试 Chrome 浏览器。';
+        if (loadingEl) loadingEl.innerHTML = '⚠️ 摄像头启动失败，请检查浏览器权限设置或刷新页面。';
       });
-    } catch(err) {
-      console.error('MediaPipe init failed:', err);
+    } catch (err) {
+      console.error('Init failed:', err);
       showErrorOverlay();
     }
   </script>
