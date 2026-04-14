@@ -88,6 +88,14 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     #loadingOverlay p { color: #aaa; font-size: 1em; margin: 8px 0; max-width: 300px; line-height: 1.6; }
     #loadingOverlay .load-title { color: #fff; font-size: 1.3em; font-weight: bold; margin-bottom: 4px; }
+    .progress-track {
+      width: 260px; height: 6px; background: rgba(255,255,255,0.15);
+      border-radius: 4px; overflow: hidden; margin: 15px auto;
+    }
+    .progress-fill {
+      width: 0%; height: 100%; background: #e94560;
+      border-radius: 4px; transition: width 0.4s ease-out;
+    }
     #errorOverlay {
       display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: #1a1a2e; z-index: 999999;
@@ -101,8 +109,10 @@
   <div id="loadingOverlay">
     <div class="spinner"></div>
     <p class="load-title">🧠 AI 视觉引擎启动中</p>
-    <p>正在加载人脸识别模型（约 4MB）<br>首次加载需要 10~30 秒，请耐心等待<br><br>
-    <span style="color:#fbc531;">💡 请确保在浏览器弹出摄像头权限时点击「允许」</span></p>
+    <div class="progress-track"><div class="progress-fill" id="loadProgress"></div></div>
+    <p>正在拉取人工智能神经网络模型<br>
+    <span style="color:#fbc531;">💡 首次加载约 10秒，此后将秒开</span><br><br>
+    <span style="color:#0abde3; font-weight: bold;">🔑 请在浏览器弹窗中点击「允许」开启监控</span></p>
   </div>
   <div id="errorOverlay">
     <h2>😢 设备加载失败</h2>
@@ -996,13 +1006,27 @@
     /* Apply translations on load, then start camera */
     applyTranslations();
 
+    let progressVal = 0;
+    const pBar = document.getElementById('loadProgress');
+    const fakeProgress = setInterval(() => {
+      if (progressVal < 92) {
+        progressVal += (92 - progressVal) * 0.08;
+        if (pBar) pBar.style.width = `${progressVal}%`;
+      }
+    }, 400);
+
     function hideLoadingOverlay() {
-      const overlay = document.getElementById('loadingOverlay');
-      overlay.style.opacity = '0';
-      setTimeout(() => { overlay.style.display = 'none'; }, 500);
+      clearInterval(fakeProgress);
+      if (pBar) pBar.style.width = '100%';
+      setTimeout(() => {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 500);
+      }, 400);
     }
 
     function showErrorOverlay() {
+      clearInterval(fakeProgress);
       document.getElementById('loadingOverlay').style.display = 'none';
       document.getElementById('errorOverlay').style.display = 'flex';
     }
