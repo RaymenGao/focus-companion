@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <title>学习辅助系统 (Web PoC)</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="./libs/camera_utils/camera_utils.js"></script>
+  <script src="./libs/face_mesh/face_mesh.js"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
     h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
@@ -1011,7 +1011,7 @@
       if (!modelReady) showErrorOverlay();
     }, 120000);
 
-    const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    const faceMesh = new FaceMesh({locateFile: (file) => `./libs/face_mesh/${file}`});
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     faceMesh.onResults(onResults);
     new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
