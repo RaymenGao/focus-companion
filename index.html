@@ -9,7 +9,9 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 15px;}
     h2 { color: #e94560; margin-top: 5px; margin-bottom: 15px; }
-    #videoElement { position: absolute; visibility: hidden; width: 640px; height: 480px; z-index: -10; }
+    #videoElement { position: absolute; left: -9999px; top: -9999px; width: 640px; height: 480px; }
+    
+    #debugLog { position: absolute; bottom: 10px; left: 10px; width: calc(100% - 20px); max-height: 100px; font-size: 10px; color: #fbc531; overflow-y: auto; text-align: left; background: rgba(0,0,0,0.4); pointer-events: none; z-index: 1000000; display: none; }
     
     canvas { width: auto; max-width: 100%; max-height: 55vh; border-radius: 12px; border: 4px solid #16213e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
@@ -111,8 +113,9 @@
     <p class="load-title">🧠 AI 视觉引擎启动中</p>
     <div class="progress-track"><div class="progress-fill" id="loadProgress"></div></div>
     <p>正在拉取人工智能神经网络模型<br>
-    <span style="color:#fbc531;">💡 首次加载约 10秒，此后将秒开</span><br><br>
+    <span style="color:#fbc531;" id="loadStatus">💡 首次加载约 10秒，此后将秒开</span><br><br>
     <span style="color:#0abde3; font-weight: bold;">🔑 请在浏览器弹窗中点击「允许」开启监控</span></p>
+    <div id="debugLog"></div>
   </div>
   <div id="errorOverlay">
     <h2>😢 设备加载失败</h2>
@@ -1036,15 +1039,40 @@
       if (!modelReady) showErrorOverlay();
     }, 120000);
 
+    // Mobile Debugging Logger
+    const debugLog = document.getElementById('debugLog');
+    function logToScreen(msg) {
+      if (!debugLog) return;
+      debugLog.style.display = 'block';
+      debugLog.innerHTML += `> ${msg}<br>`;
+      console.error(msg);
+    }
+
     const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     faceMesh.onResults(onResults);
-    try {
-      new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
-    } catch (err) {
-      console.error('Init failed:', err);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        try {
+          await faceMesh.send({image: videoElement});
+        } catch (e) {
+          logToScreen("FaceMesh Send Error: " + e.message);
+        }
+      },
+      width: 640,
+      height: 480
+    });
+
+    camera.start().then(() => {
+      document.getElementById('loadStatus').innerText = "✅ 摄像头已连接，正在同步神经网络数据...";
+    }).catch(err => {
+      logToScreen("Camera.start() Failed: " + err.name + " - " + err.message);
+      if (err.name === 'NotAllowedError') {
+        alert("请在系统设置 -> Safari/Chrome 中开启摄像头权限，然后刷新页面。");
+      }
       showErrorOverlay();
-    }
+    });
 
     // Register Service Worker for offline PWA caching of the 5MB AI Models
     if ('serviceWorker' in navigator) {
