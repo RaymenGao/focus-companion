@@ -105,12 +105,13 @@
     }
     #errorOverlay h2 { color: #e94560; } 
     #errorOverlay p { color: #ccc; max-width: 360px; line-height: 1.7; }
+    #debugLog { position: fixed; top: 10px; left: 10px; right: 10px; background: rgba(233, 69, 96, 0.9); border: 2px solid #fff; color: white; padding: 10px; border-radius: 8px; z-index: 10000000; font-size: 14px; text-align: left; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
   </style>
 </head>
 <body>
   <div id="loadingOverlay">
     <div class="spinner"></div>
-    <p class="load-title">🧠 AI 视觉引擎启动中</p>
+    <p class="load-title">🧠 AI 视觉引擎启动中 (v1.2 诊断版)</p>
     <div class="progress-track"><div class="progress-fill" id="loadProgress"></div></div>
     <p>正在拉取人工智能神经网络模型<br>
     <span style="color:#fbc531;" id="loadStatus">💡 首次加载约 10秒，此后将秒开</span><br><br>
@@ -255,6 +256,23 @@
   </div>
 
   <script>
+    window.onerror = function(msg, url, line) {
+      logToScreen("JS CRASH: " + msg + " (" + url.substring(url.lastIndexOf('/')) + ":" + line + ")", true);
+    };
+
+    function logToScreen(msg, isError = false) {
+      const debugLog = document.getElementById('debugLog');
+      if (!debugLog) {
+         console.log("[LOG-BEFORE-DOM]", msg);
+         return;
+      }
+      debugLog.style.display = 'block';
+      let timestamp = new Date().toLocaleTimeString().split(' ')[0];
+      const color = isError ? "#fff" : "#ffcc00";
+      debugLog.innerHTML += `<div style="color:${color}; margin-top:2px;">[${timestamp}] ${msg}</div>`;
+      debugLog.scrollTop = debugLog.scrollHeight;
+    }
+
     /* ===== INTERNATIONALIZATION (i18n) ===== */
     const locales = {
       zh: {
@@ -1067,13 +1085,20 @@
 
     async function initAI() {
       try {
-        logToScreen("Step 1: 初始化 FaceMesh 核心库...");
+        logToScreen("🚀 诊断开始：Step 1 - 检测基础库状态...");
+        if (typeof FaceMesh === 'undefined') {
+          logToScreen("ERROR: MediaPipe (face_mesh.js) 库未加载！请检查网络或刷新页面。", true);
+          return;
+        }
+
         const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+        logToScreen("Step 1 OK: faceMesh 对象已创建。");
+
         faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         
         faceMesh.onResults((results) => {
           if (!modelReady) {
-            logToScreen("Step 5: 成功接收到第一帧 AI 数据！加载完成。");
+            logToScreen("Step 5 OK: 成功接收到第一帧数据！加载完成。");
             modelReady = true;
             clearTimeout(watchdogTimer);
             hideLoadingOverlay();
@@ -1081,46 +1106,51 @@
           onResults(results);
         });
 
-        logToScreen("Step 2: 正在申请摄像头原生流...");
+        logToScreen("Step 2: 正在唤起摄像头 (原生模式)...");
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+           logToScreen("ERROR: 您的设备不支持 getUserMedia (需 HTTPS 访问)。", true);
+           return;
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' },
+          video: { width: {ideal: 640}, height: {ideal: 480}, facingMode: 'user' },
           audio: false
         });
         
-        logToScreen("Step 3: 摄像头流已捕获，正在注入渲染引擎...");
+        logToScreen("Step 3 OK: 摄像头流已捕获。");
         videoElement.srcObject = stream;
         
         videoElement.onloadedmetadata = () => {
-          logToScreen("Step 4: 视频元数据已就绪，启动检测循环...");
+          logToScreen("Step 4 OK: 元数据就绪，进入推理侦测循环。");
           videoElement.play();
           
           async function detectionLoop() {
-            if (modelReady || !modelReady) { // Always run once started
+            if (videoElement.srcObject) {
               try {
                 await faceMesh.send({image: videoElement});
               } catch (e) {}
-            }
-            if (videoElement.srcObject) {
               requestAnimationFrame(detectionLoop);
             }
           }
           requestAnimationFrame(detectionLoop);
         };
       } catch (err) {
-        logToScreen("CRITICAL ERROR: " + err.name + " - " + err.message);
+        logToScreen("CRITICAL FAILURE: " + err.name + " - " + err.message, true);
         showErrorOverlay();
       }
     }
 
-    initAI();
+    // Start diagnostics when user has actually seen the page
+    window.addEventListener('load', () => {
+      logToScreen("页面资源加载完毕，启动 AI 系统...");
+      initAI();
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(err => {
           console.warn('SW failed: ', err);
         });
-      });
-    }
+      }
+    });
   </script>
 </body>
 </html>
