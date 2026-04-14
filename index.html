@@ -893,6 +893,12 @@
 
     // ----- Vision AI Rendering -----
     function onResults(results) {
+      if (!modelReady) {
+        modelReady = true;
+        if (typeof watchdogTimer !== 'undefined') clearTimeout(watchdogTimer);
+        if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
+      }
+
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
       canvasCtx.save();
@@ -1005,36 +1011,10 @@
       if (!modelReady) showErrorOverlay();
     }, 120000);
 
-    function onResultsWrapper(results) {
-      if (!modelReady) {
-        modelReady = true;
-        clearTimeout(watchdogTimer);
-        hideLoadingOverlay();
-      }
-      onResults(results);
-    }
-
-    try {
-      const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
-      faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-      faceMesh.onResults(onResultsWrapper);
-      
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
-          try { await faceMesh.send({image: videoElement}); } catch(e) {}
-        },
-        width: 640,
-        height: 480
-      });
-      camera.start().catch(err => {
-        console.error('Camera start failed:', err);
-        const loadingEl = document.querySelector('#loadingOverlay p:last-of-type');
-        if (loadingEl) loadingEl.innerHTML = '⚠️ 摄像头启动失败，请检查浏览器权限设置或刷新页面。';
-      });
-    } catch (err) {
-      console.error('Init failed:', err);
-      showErrorOverlay();
-    }
+    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    faceMesh.onResults(onResults);
+    new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
   </script>
 </body>
 </html>
