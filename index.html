@@ -1015,7 +1015,21 @@
     const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     faceMesh.onResults(onResults);
-    new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
+    try {
+      new Camera(videoElement, { onFrame: async () => await faceMesh.send({image: videoElement}), width: 640, height: 480 }).start();
+    } catch (err) {
+      console.error('Init failed:', err);
+      showErrorOverlay();
+    }
+
+    // Register Service Worker for offline PWA caching of the 5MB AI Models
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('Service Worker registration failed: ', err);
+        });
+      });
+    }
   </script>
 </body>
 </html>
