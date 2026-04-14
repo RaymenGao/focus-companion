@@ -124,6 +124,7 @@
     • 刷新页面重试<br>
     • 使用 <b>Chrome/Edge 最新版</b> 打开
     </p>
+    <button class="control-btn" style="background:#e94560; margin-top:20px;" onclick="clearAppCache()">🛠️ 清除缓存并重载模型 (救砖专用)</button>
   </div>
   <button id="langBtn" onclick="toggleLanguage()">🌐 EN</button>
   
@@ -1034,51 +1035,89 @@
       document.getElementById('errorOverlay').style.display = 'flex';
     }
 
+    async function clearAppCache() {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) { await registration.unregister(); }
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (let key of keys) { await caches.delete(key); }
+      }
+      window.location.reload(true);
+    }
+
     let modelReady = false;
     const watchdogTimer = setTimeout(() => {
-      if (!modelReady) showErrorOverlay();
+      if (!modelReady) {
+        logToScreen("Watchdog Timeout: Model did not start in 120s.");
+        showErrorOverlay();
+      }
     }, 120000);
 
-    // Mobile Debugging Logger
     const debugLog = document.getElementById('debugLog');
     function logToScreen(msg) {
       if (!debugLog) return;
       debugLog.style.display = 'block';
-      debugLog.innerHTML += `> ${msg}<br>`;
-      console.error(msg);
+      let timestamp = new Date().toLocaleTimeString().split(' ')[0];
+      debugLog.innerHTML += `<span style="color:#aaa">[${timestamp}]</span> ${msg}<br>`;
+      debugLog.scrollTop = debugLog.scrollHeight;
+      console.log("[DEBUG]", msg);
     }
 
-    const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    faceMesh.onResults(onResults);
+    async function initAI() {
+      try {
+        logToScreen("Step 1: 初始化 FaceMesh 核心库...");
+        const faceMesh = new FaceMesh({locateFile: (file) => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        faceMesh.onResults((results) => {
+          if (!modelReady) {
+            logToScreen("Step 5: 成功接收到第一帧 AI 数据！加载完成。");
+            modelReady = true;
+            clearTimeout(watchdogTimer);
+            hideLoadingOverlay();
+          }
+          onResults(results);
+        });
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        try {
-          await faceMesh.send({image: videoElement});
-        } catch (e) {
-          logToScreen("FaceMesh Send Error: " + e.message);
-        }
-      },
-      width: 640,
-      height: 480
-    });
-
-    camera.start().then(() => {
-      document.getElementById('loadStatus').innerText = "✅ 摄像头已连接，正在同步神经网络数据...";
-    }).catch(err => {
-      logToScreen("Camera.start() Failed: " + err.name + " - " + err.message);
-      if (err.name === 'NotAllowedError') {
-        alert("请在系统设置 -> Safari/Chrome 中开启摄像头权限，然后刷新页面。");
+        logToScreen("Step 2: 正在申请摄像头原生流...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+          audio: false
+        });
+        
+        logToScreen("Step 3: 摄像头流已捕获，正在注入渲染引擎...");
+        videoElement.srcObject = stream;
+        
+        videoElement.onloadedmetadata = () => {
+          logToScreen("Step 4: 视频元数据已就绪，启动检测循环...");
+          videoElement.play();
+          
+          async function detectionLoop() {
+            if (modelReady || !modelReady) { // Always run once started
+              try {
+                await faceMesh.send({image: videoElement});
+              } catch (e) {}
+            }
+            if (videoElement.srcObject) {
+              requestAnimationFrame(detectionLoop);
+            }
+          }
+          requestAnimationFrame(detectionLoop);
+        };
+      } catch (err) {
+        logToScreen("CRITICAL ERROR: " + err.name + " - " + err.message);
+        showErrorOverlay();
       }
-      showErrorOverlay();
-    });
+    }
 
-    // Register Service Worker for offline PWA caching of the 5MB AI Models
+    initAI();
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => {
-          console.warn('Service Worker registration failed: ', err);
+          console.warn('SW failed: ', err);
         });
       });
     }
