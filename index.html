@@ -753,6 +753,19 @@
     bgmAudio.loop = true;
     bgmAudio.volume = 0.20;
 
+    // Detect best supported MIME type for audio recording (iOS needs mp4, PC/Android prefers webm)
+    function getRecordingMimeType() {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus',
+            'audio/ogg',
+            ''
+        ];
+        return types.find(t => !t || MediaRecorder.isTypeSupported(t)) || '';
+    }
+
     function loadBGM(inputElem) {
         if (inputElem.files && inputElem.files[0]) {
             if (bgmAudio.src && bgmAudio.src.includes('blob:')) URL.revokeObjectURL(bgmAudio.src); 
@@ -770,12 +783,19 @@
 
         if (state === 'idle' || state === 'done') {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('getUserMedia not supported');
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const mimeType = getRecordingMimeType();
+                const options = mimeType ? { mimeType } : {};
+                mediaRecorder = new MediaRecorder(stream, options);
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Use actual recorded MIME type for Blob so playback works on iOS
+                    const blobType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+                    const audioBlob = new Blob(audioChunks, { type: blobType });
                     customAudioUrl = URL.createObjectURL(audioBlob);
                     customAudio.src = customAudioUrl;
                     document.getElementById('playBtn').disabled = false;
@@ -787,18 +807,26 @@
                 btn.dataset.recState = 'recording';
                 btn.innerText = t("btnRecStop");
                 btn.style.background = "#e84118";
-                
                 setTimeout(() => { if(mediaRecorder && mediaRecorder.state === 'recording') toggleRecording(); }, 5000);
-            } catch (err) { alert(t("errCamera")); }
+            } catch (err) {
+                console.error('Recording error:', err);
+                // iOS Safari/Chrome may block mic if camera stream is active; guide user
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                if (isIOS) {
+                    alert('iOS 提示：请在「设置 → Safari/Chrome → 麦克风」中确认已允许本网站使用麦克风权限，然后重试。');
+                } else {
+                    alert(t("errCamera"));
+                }
+            }
         } else if (state === 'recording') {
             mediaRecorder.stop();
             btn.style.background = "#4cd137";
         }
     }
 
-    // Lazy-init AudioContext
+    // Lazy-init AudioContext — init on both click AND touch (mobile)
     let sharedAudioCtx = null;
-    document.body.addEventListener('click', () => {
+    function ensureAudioCtx() {
         try {
             if (!sharedAudioCtx) {
                 const Context = window.AudioContext || window.webkitAudioContext;
@@ -806,45 +834,58 @@
             }
             if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
         } catch (e) {}
-    });
+    }
+    document.body.addEventListener('click', ensureAudioCtx);
+    document.body.addEventListener('touchstart', ensureAudioCtx, { passive: true });
+    document.body.addEventListener('touchend', ensureAudioCtx, { passive: true });
 
     function playCustomAudio() { if (customAudioUrl) { customAudio.currentTime = 0; customAudio.play(); } }
 
-    function playWarningSequence() {
-        if (isSessionPaused) return; 
+    // playWarningSequence: fully async so AudioContext.resume() is properly awaited
+    // before oscillators are created — critical fix for mobile Chrome/Safari silence
+    async function playWarningSequence() {
+        if (isSessionPaused) return;
         
         try {
-            if (!sharedAudioCtx) return;
-            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(e => console.log(e));
-            
-            function beep(freq, delaySecs, durationSecs) {
-                setTimeout(() => {
-                    try {
-                        if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
-                        let osc = sharedAudioCtx.createOscillator();
-                        let gainNode = sharedAudioCtx.createGain();
-                        osc.connect(gainNode);
-                        gainNode.connect(sharedAudioCtx.destination);
-                        osc.type = "sine";
-                        osc.frequency.value = freq;
-                        gainNode.gain.value = 0.2; 
-                        
-                        osc.start();
-                        osc.stop(sharedAudioCtx.currentTime + durationSecs);
-                    } catch (e) { }
-                }, delaySecs * 1000);
+            // Create AudioContext if not yet initialized (e.g. first alarm)
+            if (!sharedAudioCtx) {
+                const Context = window.AudioContext || window.webkitAudioContext;
+                sharedAudioCtx = new Context();
+            }
+            // MUST await resume — mobile browsers suspend AudioContext aggressively
+            if (sharedAudioCtx.state === 'suspended') {
+                await sharedAudioCtx.resume();
             }
 
-            beep(700, 0, 0.15); 
-            beep(700, 0.35, 0.15); 
-            beep(700, 0.70, 0.15);
-        } catch (err) { }
+            // Async beep: each beep waits for context to be running before scheduling
+            async function beep(freq, delaySecs, durationSecs) {
+                await new Promise(resolve => setTimeout(resolve, delaySecs * 1000));
+                try {
+                    if (sharedAudioCtx.state === 'suspended') await sharedAudioCtx.resume();
+                    const osc = sharedAudioCtx.createOscillator();
+                    const gainNode = sharedAudioCtx.createGain();
+                    osc.connect(gainNode);
+                    gainNode.connect(sharedAudioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gainNode.gain.value = 0.25;
+                    osc.start();
+                    osc.stop(sharedAudioCtx.currentTime + durationSecs);
+                } catch (e) { console.warn('beep error:', e); }
+            }
 
+            // Fire all three beeps in parallel (each manages its own delay)
+            beep(700, 0,    0.15);
+            beep(700, 0.35, 0.15);
+            beep(700, 0.70, 0.15);
+        } catch (err) { console.warn('playWarningSequence error:', err); }
+
+        // Play custom voice after beeps
         setTimeout(() => { 
             try {
                 if (customAudioUrl && !isSessionPaused) { 
                     customAudio.currentTime = 0; 
-                    customAudio.play().catch(e=>console.error(e)); 
+                    customAudio.play().catch(e => console.warn('custom audio play failed:', e)); 
                 } 
             } catch (err) {}
         }, 1100);
