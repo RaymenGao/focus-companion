@@ -1,0 +1,9 @@
+{
+  "name": "FocusLens v2",
+  "short_name": "FocusLens",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#10213f",
+  "description": "Multimodal focus tracker and AI tutor workbench"
+}

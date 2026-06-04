@@ -1,0 +1,43 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+.turbo/
+
+# Python runtime
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# Local app data and generated records
+*.db
+*.sqlite
+*.sqlite3
+focuslens-api/wiki/
+wiki/
+
+# Logs and local process helpers
+*.log
+*.out.log
+*.err.log
+
+# Secrets and machine-local configuration
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*
+*credential*
+
+# Tooling scratch files
+.playwright-mcp/
+.claude/
+.agents/
+skills-lock.json
+index_old.html
+
+# TypeScript incremental cache
+*.tsbuildinfo
