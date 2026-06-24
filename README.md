@@ -8,7 +8,8 @@ FocusLens V2 is a multimodal study companion for children who need gentler focus
 - Dual-camera workflow: front camera for face/head attention tracking, overhead camera for writing activity and paper capture.
 - AI teacher support through a local FastAPI proxy and OpenAI-compatible multimodal APIs.
 - Voice-first interaction: F8 for capture-and-ask, F9 for contextual follow-up, F10 for voice-only questions.
-- Mistake book and knowledge wiki with Markdown + LaTeX rendering.
+- Markdown-first learning events: every photographed question, voice question, and contextual follow-up is saved locally before it is curated into knowledge.
+- Curated knowledge wiki with manual weak/learning/mastered/ignored status, Markdown + LaTeX rendering, practice papers, flashcards, and reports.
 - Study dashboard, calendar, reminders, custom voice prompt, background music, and local focus reports.
 
 ## Repository Layout
@@ -57,6 +58,17 @@ V2 expects third-party OpenAI-compatible model settings to be configured in the 
 
 The browser should talk to the local FocusLens API. The local API then talks to the model provider. This keeps API keys out of frontend source code and avoids browser CORS problems.
 
+## Learning Knowledge Pipeline
+
+1. F8 creates a photographed-question event with optional voice context.
+2. F10 creates a voice-only knowledge-question event.
+3. F9 appends a contextual follow-up to the currently selected event.
+4. The AI reasoning is shown immediately; the final answer stays hidden until explicitly revealed.
+5. An event becomes a reusable knowledge page only after the user selects **沉淀为知识点**.
+6. Knowledge marked **已掌握** or **忽略** is excluded from default paper and flashcard generation.
+
+Local source-of-truth files live under `focuslens-api/wiki/events/`, `focuslens-api/wiki/knowledge/`, `focuslens-api/wiki/papers/`, `focuslens-api/wiki/flashcards/`, and `focuslens-api/wiki/reports/`. These generated study records remain ignored by Git.
+
 ## Privacy And Secret Safety
 
 Do not commit real API keys or local study data.
@@ -80,4 +92,3 @@ index.html
 ```
 
 Open it directly in Chrome or Edge. It is still a pure browser app and does not require the V2 backend.
-

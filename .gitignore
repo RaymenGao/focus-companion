@@ -15,7 +15,7 @@ __pycache__/
 *.sqlite
 *.sqlite3
 focuslens-api/wiki/
-wiki/
+/wiki/
 
 # Logs and local process helpers
 *.log

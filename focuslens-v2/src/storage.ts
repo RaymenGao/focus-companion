@@ -17,11 +17,26 @@ export const defaultAiConfig: AiConfig = {
   captureRegion: { x: 0.12, y: 0.18, width: 0.76, height: 0.68 },
   useStreaming: true,
   enableThinking: false,
+  useBackendAsr: true,
+  useBackendTts: true,
+  ttsMode: "edge-tts" as const,
+  edgeTtsVoice: "zh-CN-YunxiNeural",
+  asrBaseUrl: "",
+  asrApiKey: "",
+  asrModel: "whisper-1",
+  ttsBaseUrl: "",
+  ttsApiKey: "",
+  ttsModel: "tts-1",
+  ttsVoice: "alloy",
+  ttsSpeed: 1,
+  ttsInstruct: "",
+  ttsLanguage: "",
   paperFocusMode: "auto",
   paperFocusDistance: 0.8,
   singleCallBudgetUsd: 0.05,
   dailyBudgetUsd: 1,
-  allowImageUpload: true
+  allowImageUpload: true,
+  allowInsecureAiTls: false
 };
 
 export const defaultTutorProfile: TutorProfile = {
@@ -97,9 +112,27 @@ export function loadAiConfig() {
   if (typeof config.useStreaming !== "boolean") {
     config.useStreaming = true;
   }
+  if (typeof config.allowInsecureAiTls !== "boolean") {
+    config.allowInsecureAiTls = false;
+  }
   if (typeof config.enableThinking !== "boolean") {
     config.enableThinking = false;
   }
+  if (typeof config.useBackendAsr !== "boolean") config.useBackendAsr = true;
+  if (typeof config.useBackendTts !== "boolean") config.useBackendTts = true;
+  // 迁移：旧 useBackendTts boolean → 新 ttsMode 三选一
+  if (!config.ttsMode) {
+    config.ttsMode = config.useBackendTts ? "cloud" : "browser";
+  }
+  if (!config.edgeTtsVoice) config.edgeTtsVoice = "zh-CN-YunxiNeural";
+  if (!config.asrModel) config.asrModel = "whisper-1";
+  if (typeof config.asrApiKey !== "string") config.asrApiKey = "";
+  if (!config.ttsModel) config.ttsModel = "tts-1";
+  if (typeof config.ttsApiKey !== "string") config.ttsApiKey = "";
+  if (!config.ttsVoice) config.ttsVoice = "alloy";
+  if (typeof config.ttsSpeed !== "number") config.ttsSpeed = 1;
+  if (typeof config.ttsInstruct !== "string") config.ttsInstruct = "";
+  if (typeof config.ttsLanguage !== "string") config.ttsLanguage = "";
   if (config.paperFocusMode !== "manual" && config.paperFocusMode !== "auto") {
     config.paperFocusMode = "auto";
   }

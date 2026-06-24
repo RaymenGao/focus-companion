@@ -2,9 +2,23 @@ import katex from "katex";
 import { marked } from "marked";
 import "katex/dist/katex.min.css";
 
+export function stripJsonFrontmatter(markdown: string): string {
+  return markdown.replace(/^---json\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
 export function renderMathMarkdown(markdown: string): string {
   // Auto-close any unclosed math blocks from truncated AI responses
-  let closedMarkdown = markdown;
+  let closedMarkdown = stripJsonFrontmatter(markdown)
+    .replace(
+      /\[\[wiki:\/\/([^|\]]+)\|([^\]]+)\]\]/g,
+      (_match, pageId, label) => `[${label}](wiki://${encodeURIComponent(pageId)})`,
+    )
+    .replace(
+      /\[\[evidence:\/\/([^|\]]+)\|([^\]]+)\]\]/g,
+      (_match, evidenceId, label) => `[${label}](evidence://${encodeURIComponent(evidenceId)})`,
+    )
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr) => `$$${expr}$$`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr) => `$${expr}$`);
   const doubleDollarCount = (closedMarkdown.match(/\$\$/g) || []).length;
   if (doubleDollarCount % 2 !== 0) {
     closedMarkdown = closedMarkdown + "\n$$";
@@ -50,5 +64,5 @@ export function renderMathMarkdown(markdown: string): string {
     htmlResult = htmlResult.replace(`KATEXINLINEPLACEHOLDER${i}`, placeholders[i]);
   }
 
-  return htmlResult;
+  return htmlResult.replace(/<a href="(https?:\/\/[^"]+)"/g, '<a href="$1" target="_blank" rel="noreferrer"');
 }

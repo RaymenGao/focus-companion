@@ -4,3 +4,4 @@ pydantic==2.12.5
 sqlalchemy==2.0.44
 httpx==0.28.1
 python-multipart==0.0.20
+edge-tts==7.2.8
